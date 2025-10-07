@@ -1,0 +1,9 @@
+@keyframes slide {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.animate-slide {
+  animation: slide 3s infinite;
+}
