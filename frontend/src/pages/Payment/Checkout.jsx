@@ -26,7 +26,7 @@ const Checkout = () => {
   };
 
   const orderType = determineOrderType();
-  const isEbookOnly = orderType === "ebook" || "audiobook";
+  const isEbookOnly = orderType === "ebook" || orderType === "audiobook";
   const requiresShipping = !isEbookOnly;
 
   // Calculate total price

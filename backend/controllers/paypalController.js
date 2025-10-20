@@ -75,8 +75,9 @@ const createPaypalCheckoutSession = async (req, res, next) => {
     const { shippingInfo, orderItems, itemsPrice, shippingPrice, totalPrice } =
       req.body;
 
-    const orderType = determineOrderType(orderItems);
-    const isEbookOnly = orderType === "ebook" || "audiobook";
+    const orderType = determineOrderType(orderItems); // ✅ assign করা হলো
+    const digitalTypes = ["ebook", "audiobook"];
+    const isEbookOnly = digitalTypes.includes(orderType); // এখন ঠিক
 
     const request = new paypal.orders.OrdersCreateRequest();
     request.prefer("return=representation");
@@ -173,7 +174,8 @@ const capturePaypalOrder = async (req, res) => {
     // Parse session metadata
     const minimalOrderItems = JSON.parse(orderItems);
     const parsedShippingInfo = JSON.parse(shippingInfo);
-    const isEbookOnly = orderType === "ebook" || "audiobook";
+    const digitalTypes = ["ebook", "audiobook"];
+    const isEbookOnly = digitalTypes.includes(orderType);
 
     // Fetch complete item details from appropriate models
     const completeOrderItems = await getItemDetails(minimalOrderItems);

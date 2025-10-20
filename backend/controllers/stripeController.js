@@ -68,8 +68,9 @@ const createCheckoutSession = async (req, res, next) => {
     const { shippingInfo, orderItems, itemsPrice, shippingPrice, totalPrice } =
       req.body;
 
-    const orderType = determineOrderType(orderItems);
-    const isEbookOnly = orderType === "ebook" || "audiobook";
+    const orderType = determineOrderType(orderItems); // add this line
+    const digitalTypes = ["ebook", "audiobook"];
+    const isEbookOnly = digitalTypes.includes(orderType);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -142,7 +143,8 @@ const stripeWebhook = async (req, res) => {
     const shippingPrice = Number(session.metadata.shippingPrice);
     const totalPrice = Number(session.metadata.totalPrice);
     const orderType = session.metadata.orderType;
-    const isEbookOnly = orderType === "ebook" || "audiobook";
+    const digitalTypes = ["ebook", "audiobook"];
+    const isEbookOnly = digitalTypes.includes(orderType);
 
     // Fetch complete item details from appropriate models
     const completeOrderItems = await getItemDetails(minimalOrderItems);
