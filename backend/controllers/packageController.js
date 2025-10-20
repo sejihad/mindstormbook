@@ -8,7 +8,7 @@ const cloudinary = require("cloudinary");
 const createPackage = catchAsyncErrors(async (req, res, next) => {
   const requiredFields = [
     "name",
-    "title",
+
     "description",
     "oldPrice",
     "discountPrice",

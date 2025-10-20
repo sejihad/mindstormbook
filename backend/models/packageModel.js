@@ -54,7 +54,7 @@ const PackageSchema = new mongoose.Schema({
   },
   title: {
     type: String,
-    required: [true, "Please enter book title"],
+
     trim: true,
   },
   description: {

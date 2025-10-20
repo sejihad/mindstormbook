@@ -8,7 +8,7 @@ const createBook = catchAsyncErrors(async (req, res, next) => {
   // Validate required fields
   const requiredFields = [
     "name",
-    "title",
+
     "description",
     "writer",
     "oldPrice",
