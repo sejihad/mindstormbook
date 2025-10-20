@@ -1,6 +1,7 @@
 const Book = require("../models/bookModel");
 const ErrorHandler = require("../utils/errorHandler");
 const catchAsyncErrors = require("../middleware/catchAsyncErrors");
+const { Readable } = require("stream");
 const slugify = require("slugify");
 const cloudinary = require("cloudinary").v2;
 const createBook = catchAsyncErrors(async (req, res, next) => {

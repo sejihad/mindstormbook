@@ -1,7 +1,10 @@
+import { jwtDecode } from "jwt-decode";
 import { useEffect } from "react";
+import { useDispatch } from "react-redux";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { logout } from "./actions/userAction";
 import Footer from "./component/layout/Footer";
 import Header from "./component/layout/Header";
 import ScrollToTop from "./component/layout/ScrollToTop";
@@ -63,9 +66,23 @@ import UpdatePassword from "./pages/User/UpdatePassword";
 import UpdateProfile from "./pages/User/UpdateProfile";
 
 const App = () => {
+  const dispatch = useDispatch();
   useEffect(() => {
     // enableContentProtection();
   }, []);
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        if (decoded.exp * 1000 < Date.now()) {
+          dispatch(logout());
+        }
+      } catch {
+        dispatch(logout());
+      }
+    }
+  }, [dispatch]);
   return (
     <BrowserRouter>
       <ScrollToTop />
