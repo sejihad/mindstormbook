@@ -25,7 +25,6 @@ const Login = () => {
     otpPending,
     otpUserId,
     otpMessage,
-   
   } = useSelector((state) => state.user);
 
   const [loginEmail, setLoginEmail] = useState("");
@@ -82,7 +81,6 @@ const Login = () => {
       toast.error(error);
       dispatch(clearErrors());
     }
- 
   }, [dispatch, error]);
 
   const loginSubmit = (e) => {

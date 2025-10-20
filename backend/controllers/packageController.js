@@ -347,7 +347,7 @@ const updatePackage = catchAsyncErrors(async (req, res, next) => {
 
 // Get All Packages
 const getAllPackages = catchAsyncErrors(async (req, res, next) => {
-  const packages = await Package.find();
+  const packages = await Package.find().sort({ createdAt: -1 });
 
   res.status(200).json({
     success: true,
@@ -357,7 +357,7 @@ const getAllPackages = catchAsyncErrors(async (req, res, next) => {
 
 // Get All Packages (Admin)
 const getAdminPackages = catchAsyncErrors(async (req, res, next) => {
-  const packages = await Package.find();
+  const packages = await Package.find().sort({ createdAt: -1 });
 
   res.status(200).json({
     success: true,

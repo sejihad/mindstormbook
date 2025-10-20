@@ -497,7 +497,7 @@ const updateBook = catchAsyncErrors(async (req, res, next) => {
 
 // get all prodcuts
 const getAllBooks = catchAsyncErrors(async (req, res, next) => {
-  const books = await Book.find();
+  const books = await Book.find().sort({ createdAt: -1 });
 
   res.status(200).json({
     success: true,
@@ -506,7 +506,7 @@ const getAllBooks = catchAsyncErrors(async (req, res, next) => {
 });
 // Get All Product (Admin)
 const getAdminBooks = catchAsyncErrors(async (req, res, next) => {
-  const books = await Book.find();
+  const books = await Book.find().sort({ createdAt: -1 });
 
   res.status(200).json({
     success: true,
