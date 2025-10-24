@@ -557,9 +557,6 @@ const AdminOrderDetails = () => {
                             <div className="text-sm font-medium text-gray-900">
                               {item.name}
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {item.id}
-                            </div>
 
                             {/* Package-এর বইগুলোর নাম দেখানো */}
                             {renderBookNames(item)}

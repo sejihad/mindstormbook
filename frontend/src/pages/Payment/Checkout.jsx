@@ -60,6 +60,32 @@ const Checkout = () => {
   const [isFormComplete, setIsFormComplete] = useState(!requiresShipping);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Priority countries - United States, Mexico, Canada first
+  const getPriorityCountries = () => {
+    const allCountries = Country.getAllCountries();
+    const priorityCodes = ["US", "MX", "CA"]; // USA, Mexico, Canada
+
+    const priorityCountries = [];
+    const otherCountries = [];
+
+    allCountries.forEach((country) => {
+      if (priorityCodes.includes(country.isoCode)) {
+        priorityCountries.push(country);
+      } else {
+        otherCountries.push(country);
+      }
+    });
+
+    // Sort priority countries in specific order
+    const sortedPriorityCountries = priorityCodes
+      .map((code) =>
+        priorityCountries.find((country) => country.isoCode === code)
+      )
+      .filter(Boolean);
+
+    return [...sortedPriorityCountries, ...otherCountries];
+  };
+
   // Fetch book details for packages
   useEffect(() => {
     const fetchBookDetails = async () => {
@@ -332,7 +358,7 @@ const Checkout = () => {
                     required
                   >
                     <option value="">Select Country</option>
-                    {Country.getAllCountries().map((country) => (
+                    {getPriorityCountries().map((country) => (
                       <option key={country.isoCode} value={country.isoCode}>
                         {country.name}
                       </option>
