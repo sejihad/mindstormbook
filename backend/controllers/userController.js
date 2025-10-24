@@ -10,7 +10,7 @@ const cloudinary = require("cloudinary");
 
 // ✅ Register User
 const registerUser = catchAsyncErrors(async (req, res, next) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, bookTerms } = req.body;
 
   if (!name || !email || !password) {
     return next(
@@ -24,12 +24,53 @@ const registerUser = catchAsyncErrors(async (req, res, next) => {
     password,
   });
 
+  // Welcome message based on bookTerms
+  let message = `
+    Hi ${name},
+
+    🎉 Welcome to MindStorm Books Shop!
+
+    Your account has been created successfully.
+    You can now log in using your email: ${email}
+  `;
+
+  // Add sampler book link if user agreed to terms
+  if (bookTerms === "true") {
+    message += `
+
+    📚 Your Free Sampler Book:
+
+    Here is your exclusive sampler book download link:
+    🔗 https://mindstormbook.com
+`;
+  }
+
+  message += `
+
+    If you have any questions, feel free to reply to this email.
+
+    Happy Reading!
+   
+  `;
+
+  try {
+    await sendEmail({
+      email: user.email,
+      subject:
+        bookTerms === "true"
+          ? "Welcome to MindStorm Books Shop - Your Sampler Book Inside! 🎉📚"
+          : "Welcome to MindStorm Books Shop 🎉",
+      message,
+    });
+  } catch (error) {
+    // no need to throw error, registration should still succeed
+  }
+
   res.status(201).json({
     success: true,
     message: "User registered successfully",
   });
 });
-
 const loginUser = catchAsyncErrors(async (req, res, next) => {
   const { email, password } = req.body;
 
@@ -68,10 +109,10 @@ const loginUser = catchAsyncErrors(async (req, res, next) => {
     const otp = crypto.randomInt(100000, 999999).toString();
 
     user.twoFactorCode = otp;
-    user.twoFactorExpire = Date.now() + 5 * 60 * 1000; // 5 minutes
+    user.twoFactorExpire = Date.now() + 15 * 60 * 1000; // 5 minutes
     await user.save();
 
-    const message = `Your login OTP is ${otp}. It will expire in 5 minutes.`;
+    const message = `Your login OTP is ${otp}. It will expire in 15 minutes.`;
 
     await sendEmail({
       email: user.email,
@@ -284,9 +325,9 @@ const getUserDetails = catchAsyncErrors(async (req, res, next) => {
 
 // update profile
 const updateProfile = catchAsyncErrors(async (req, res, next) => {
-  const { name, number, avatar, country } = req.body;
+  const { name, number, avatar, country, email } = req.body;
 
-  const newUserData = { name, number, country };
+  const newUserData = { name, number, country, email };
 
   const user = await User.findById(req.user.id);
 

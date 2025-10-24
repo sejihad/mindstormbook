@@ -112,6 +112,25 @@ const BookDetails = () => {
 
   const hasReviewed = book?.reviews?.some((r) => r.user === user?._id);
   const handleBuyNow = (type, item) => {
+    if (!user) {
+      toast.error("Please login to continue");
+      navigate("/login");
+      return;
+    }
+    if (!user?.country || !user?.number) {
+      toast.info("Please complete your profile before checkout");
+      navigate("/profile/update", {
+        state: {
+          from: "/checkout",
+          checkoutState: {
+            cartItems: [item],
+            type: type,
+          },
+        },
+      });
+      return;
+    }
+
     navigate("/checkout", {
       state: {
         cartItems: [item],

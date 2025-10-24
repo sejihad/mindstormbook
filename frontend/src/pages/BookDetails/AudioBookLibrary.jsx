@@ -22,21 +22,53 @@ const AudiobookLibrary = () => {
   const audiobookOrders = orders
     ?.filter((order) => order.payment?.status === "paid")
     .map((order) => {
+      // 🎧 1️⃣ If the order itself is audiobook
       if (order.order_type === "audiobook") {
         return order;
-      } else if (order.order_type === "mixed") {
+      }
+
+      // 🎧 2️⃣ Mixed order (some audiobooks, some not)
+      else if (order.order_type === "mixed") {
         const audiobookItems = order.orderItems?.filter(
           (item) => item.type === "audiobook"
         );
-
         if (audiobookItems.length > 0) {
           return { ...order, orderItems: audiobookItems };
         }
       }
+
+      // 🎧 3️⃣ Package order (contains only book IDs)
+      else if (order.order_type === "package") {
+        const packageAudiobooks = [];
+
+        order.orderItems?.forEach((pkg) => {
+          // ধরো প্রতিটি package item এ আছে: { packageBooks: [bookId1, bookId2, ...] }
+          pkg.books?.forEach((bookId) => {
+            const book = books.find((b) => b._id === bookId);
+
+            // 📌 চেক করছি বইটা audiobook কিনা
+            if (book && book.type === "audiobook") {
+              packageAudiobooks.push({
+                id: book._id,
+                name: book.name,
+                image: book.image?.url || book.cover || "",
+                type: "audiobook",
+                fullAudio: book.fullAudio?.url || "",
+                category: book.category,
+                slug: book.slug,
+              });
+            }
+          });
+        });
+
+        if (packageAudiobooks.length > 0) {
+          return { ...order, orderItems: packageAudiobooks };
+        }
+      }
+
       return null;
     })
     .filter(Boolean);
-
   const openAudioPlayer = (audiobook) => {
     setCurrentAudiobook(audiobook);
     setShowAudio(true);

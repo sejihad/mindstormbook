@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { getBook } from "../../actions/bookAction";
 import { paypalOrderCreate } from "../../actions/paypalAction";
 import { getShips } from "../../actions/shipAction";
 import { stripeOrderCreate } from "../../actions/stripeAction";
@@ -18,6 +19,10 @@ const Checkout = () => {
 
   const { user, isAuthenticated } = useSelector((state) => state.user);
   const { ships } = useSelector((state) => state.ships);
+  const { books } = useSelector((state) => state.books);
+
+  const [booksData, setBooksData] = useState({});
+  const [isLoadingBooks, setIsLoadingBooks] = useState(false);
 
   // Determine order type
   const determineOrderType = () => {
@@ -54,6 +59,44 @@ const Checkout = () => {
     useState(requiresShipping);
   const [isFormComplete, setIsFormComplete] = useState(!requiresShipping);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch book details for packages
+  useEffect(() => {
+    const fetchBookDetails = async () => {
+      if (cartItems.length === 0) return;
+
+      const packageItems = cartItems.filter(
+        (item) => item.type === "package" && item.books && item.books.length > 0
+      );
+
+      if (packageItems.length === 0) return;
+
+      setIsLoadingBooks(true);
+
+      try {
+        // Fetch all books
+        await dispatch(getBook());
+      } catch (error) {
+        console.error("Error fetching books:", error);
+        toast.error("Failed to load book details");
+      } finally {
+        setIsLoadingBooks(false);
+      }
+    };
+
+    fetchBookDetails();
+  }, [cartItems, dispatch]);
+
+  // Process books data when books are loaded
+  useEffect(() => {
+    if (books.length > 0) {
+      const bookMap = {};
+      books.forEach((book) => {
+        bookMap[book._id] = book;
+      });
+      setBooksData(bookMap);
+    }
+  }, [books]);
 
   // Check if all required fields are filled
   useEffect(() => {
@@ -106,32 +149,67 @@ const Checkout = () => {
     if (requiresShipping && (!user?.country || !user?.number)) {
       toast.info("Complete Your Profile");
       navigate("/profile/update");
+      return;
     }
   }, [isAuthenticated, user, navigate, location.pathname, requiresShipping]);
 
   // Handle country change (only if shipping required)
   useEffect(() => {
-    if (!requiresShipping || !selectedCountry) return;
+    if (!requiresShipping || !selectedCountry) {
+      setShippingCharge(0);
+      setIsShippingAvailable(false);
+      return;
+    }
 
     try {
       const countryData = Country.getCountryByCode(selectedCountry);
-      if (!countryData) return;
+      if (!countryData) {
+        setShippingCharge(0);
+        setIsShippingAvailable(false);
+        return;
+      }
 
       setShippingInfo((prev) => ({
         ...prev,
         country: countryData.name || "",
       }));
 
-      // Check shipping availability
-      const shipInfo = ships.find(
+      // Check shipping availability and charge
+      const specificCountryCharge = ships.find(
         (ship) => ship.country.toLowerCase() === countryData.name.toLowerCase()
       );
 
-      setShippingCharge(shipInfo?.charge || 0);
-      setIsShippingAvailable(!!shipInfo);
+      const allCountriesCharge = ships.find(
+        (ship) => ship.country.toLowerCase() === "all countries"
+      );
+
+      // Priority: Specific Country > All Countries > 0
+      let finalShippingCharge = 0;
+      let isAvailable = false;
+
+      if (specificCountryCharge) {
+        finalShippingCharge = specificCountryCharge.charge;
+        isAvailable = true;
+      } else if (allCountriesCharge) {
+        finalShippingCharge = allCountriesCharge.charge;
+        isAvailable = true;
+      } else {
+        finalShippingCharge = 0;
+        isAvailable = false;
+      }
+
+      setShippingCharge(finalShippingCharge);
+      setIsShippingAvailable(isAvailable);
+
+      // Optional: Show message if shipping is not available
+      if (!isAvailable) {
+        console.log(`No shipping available for ${countryData.name}`);
+      }
     } catch (error) {
       console.error("Country data error:", error);
       toast.error("Error loading country data");
+      setShippingCharge(0);
+      setIsShippingAvailable(false);
     }
   }, [selectedCountry, ships, requiresShipping]);
 
@@ -171,6 +249,33 @@ const Checkout = () => {
     } else {
       dispatch(paypalOrderCreate(orderData));
     }
+  };
+
+  // Function to get book name by ID
+  const getBookName = (bookId) => {
+    if (isLoadingBooks) return "Loading...";
+    return booksData[bookId]?.name || "Book not found";
+  };
+
+  // Function to render book names for packages
+  const renderBookNames = (item) => {
+    if (item.type === "package" && item.books && item.books.length > 0) {
+      return (
+        <div className="mt-1">
+          <p className="text-xs text-gray-500">
+            Includes {item.books.length} book{item.books.length > 1 ? "s" : ""}:
+          </p>
+          <div className="max-h-16 overflow-y-auto">
+            {item.books.map((bookId, index) => (
+              <p key={index} className="text-xs text-gray-600 truncate">
+                • {getBookName(bookId)}
+              </p>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return null;
   };
 
   if (isLoading) {
@@ -340,14 +445,20 @@ const Checkout = () => {
 
             <div className="divide-y">
               {cartItems.map((item, i) => (
-                <div key={i} className="py-3 flex justify-between">
-                  <div>
-                    <p className="font-medium">{item.name || item.title}</p>
-                    <p className="text-sm text-gray-600">
-                      {item.quantity} × ${item.price.toFixed(2)} ({item.type})
+                <div key={i} className="py-3">
+                  <div className="flex justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">{item.name || item.title}</p>
+                      <p className="text-sm text-gray-600">
+                        {item.quantity} × ${item.price.toFixed(2)} ({item.type})
+                      </p>
+                      {/* Show books included for packages */}
+                      {renderBookNames(item)}
+                    </div>
+                    <p className="font-semibold">
+                      ${(item.price * item.quantity).toFixed(2)}
                     </p>
                   </div>
-                  <p>${(item.price * item.quantity).toFixed(2)}</p>
                 </div>
               ))}
             </div>

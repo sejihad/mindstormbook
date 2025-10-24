@@ -17,14 +17,6 @@ const EBookPage = () => {
 
   const filteredBooks = books.filter((book) => book.type === "ebook");
 
-  const indexOfLastBook = currentPage * booksPerPage;
-  const indexOfFirstBook = indexOfLastBook - booksPerPage;
-  const currentBooks = filteredBooks.slice(indexOfFirstBook, indexOfLastBook);
-
-  const totalPages = Math.ceil(filteredBooks.length / booksPerPage);
-
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
   return (
     <section className="container min-h-screen mx-auto px-4 py-8">
       {loading ? (
@@ -35,26 +27,7 @@ const EBookPage = () => {
         </div>
       ) : (
         <>
-          <BookSection title={`E`} books={currentBooks} loading={loading} />
-
-          {/* Pagination */}
-          <div className="flex justify-center mt-10">
-            <div className="flex space-x-2">
-              {[...Array(totalPages).keys()].map((num) => (
-                <button
-                  key={num + 1}
-                  onClick={() => paginate(num + 1)}
-                  className={`px-3 py-1 rounded-md border text-sm font-medium ${
-                    currentPage === num + 1
-                      ? "bg-green-500 text-white"
-                      : "bg-white text-gray-700"
-                  }`}
-                >
-                  {num + 1}
-                </button>
-              ))}
-            </div>
-          </div>
+          <BookSection title={`E`} books={filteredBooks} loading={loading} />
         </>
       )}
     </section>

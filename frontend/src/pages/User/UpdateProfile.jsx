@@ -5,11 +5,14 @@ import {
   FiCamera,
   FiChevronDown,
   FiGlobe,
+  FiMail,
   FiPhone,
   FiUser,
 } from "react-icons/fi";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { clearErrors, loadUser, updateProfile } from "../../actions/userAction";
 import Loader from "../../component/layout/Loader/Loader";
@@ -19,6 +22,7 @@ import { UPDATE_PROFILE_RESET } from "../../constants/userContants";
 const UpdateProfile = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef(null);
   const countryDropdownRef = useRef(null);
 
@@ -26,7 +30,8 @@ const UpdateProfile = () => {
   const { error, isUpdated, loading } = useSelector((state) => state.profile);
 
   const [name, setName] = useState("");
-  const [number, setNumber] = useState("");
+  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [country, setCountry] = useState("");
   const [countrySearch, setCountrySearch] = useState("");
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
@@ -67,6 +72,14 @@ const UpdateProfile = () => {
     }
   }, [countrySearch]);
 
+  // Auto-detect country code from phone number for PhoneInput
+  const getCountryCodeFromCountryName = (countryName) => {
+    const countryObj = Country.getAllCountries().find(
+      (c) => c.name === countryName
+    );
+    return countryObj ? countryObj.isoCode : "US";
+  };
+
   const updateProfileSubmit = async (e) => {
     e.preventDefault();
 
@@ -75,11 +88,14 @@ const UpdateProfile = () => {
     if (name !== user.name) {
       formData.name = name;
     }
+    if (email !== user.email) {
+      formData.email = email;
+    }
     if (country !== user.country) {
       formData.country = country;
     }
-    if (number !== user.number) {
-      formData.number = number;
+    if (phoneNumber !== user.number) {
+      formData.number = phoneNumber;
     }
 
     if (avatar) {
@@ -125,8 +141,9 @@ const UpdateProfile = () => {
   useEffect(() => {
     if (user) {
       setName(user.name || "");
+      setEmail(user.email || "");
       setCountry(user.country || "");
-      setNumber(user.number || "");
+      setPhoneNumber(user.number || "");
       setAvatarPreview(user.avatar?.url || "/Profile.png");
     }
   }, [user]);
@@ -135,10 +152,15 @@ const UpdateProfile = () => {
     if (isUpdated) {
       toast.success("Profile Updated Successfully");
       dispatch(loadUser());
-      navigate("/profile");
+      const redirectTo = location.state?.from || "/profile";
+      const checkoutState = location.state?.checkoutState;
+
+      // Navigate with original state
+      navigate(redirectTo, { state: checkoutState });
+
       dispatch({ type: UPDATE_PROFILE_RESET });
     }
-  }, [isUpdated, dispatch, navigate]);
+  }, [isUpdated, dispatch, navigate, location.state]);
 
   useEffect(() => {
     if (error) {
@@ -233,6 +255,20 @@ const UpdateProfile = () => {
                       placeholder="Enter your full name"
                     />
                   </div>
+                  {user?.provider === "local" && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-600 flex items-center">
+                        <FiMail className="mr-2" /> Email
+                      </label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition"
+                        placeholder="Enter your email"
+                      />
+                    </div>
+                  )}
 
                   {/* Country Field */}
                   <div className="space-y-1" ref={countryDropdownRef}>
@@ -289,17 +325,22 @@ const UpdateProfile = () => {
                     </div>
                   </div>
 
-                  {/* Phone Field */}
+                  {/* Phone Field with International Format */}
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-gray-600 flex items-center">
                       <FiPhone className="mr-2" /> Phone Number
                     </label>
-                    <input
-                      type="text"
-                      value={number}
-                      onChange={(e) => setNumber(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition"
-                      placeholder="Enter your phone number"
+                    <PhoneInput
+                      international
+                      countryCallingCodeEditable={false}
+                      defaultCountry={
+                        getCountryCodeFromCountryName(country) || "US"
+                      }
+                      value={phoneNumber}
+                      onChange={setPhoneNumber}
+                      className="w-full "
+                      inputClassName="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition"
+                      dropdownClassName="z-10"
                     />
                   </div>
 

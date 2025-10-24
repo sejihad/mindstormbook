@@ -48,9 +48,11 @@ const getItemDetails = async (items) => {
             image: book?.image?.url,
           };
         } else if (item.type === "package") {
-          const package = await Package.findById(item.id).select(
-            "name discountPrice image type"
-          );
+          // Populate books array inside package
+          const package = await Package.findById(item.id)
+            .populate("books", "name discountPrice image type")
+            .select("name discountPrice image type books");
+
           return {
             id: item.id,
             type: item.type,
@@ -58,11 +60,12 @@ const getItemDetails = async (items) => {
             name: package?.name,
             price: package?.discountPrice,
             image: package?.image?.url,
+            books: package?.books || [], // include full books array
           };
         }
         return item; // fallback
       } catch (error) {
-        return item; // return basic info if error occurs
+        return item; // return minimal info if error occurs
       }
     })
   );

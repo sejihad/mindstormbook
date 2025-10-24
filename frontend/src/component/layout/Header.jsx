@@ -22,7 +22,7 @@ const Header = () => {
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
 
-  const [cartItemCount, setCartItemCount] = useState(0);
+  // const [cartItemCount, setCartItemCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -40,17 +40,17 @@ const Header = () => {
 
   const { isAuthenticated, user } = useSelector((state) => state.user);
   const { categories } = useSelector((state) => state.categories);
+  const { cartCount } = useSelector((state) => state.Cart);
+  // useEffect(() => {
+  //   const Cart = JSON.parse(localStorage.getItem("CartItems")) || [];
 
-  useEffect(() => {
-    const Cart = JSON.parse(localStorage.getItem("CartItems")) || [];
+  //   const cartCount = Cart.reduce(
+  //     (total, item) => total + (item.quantity || 1),
+  //     0
+  //   );
 
-    const cartCount = Cart.reduce(
-      (total, item) => total + (item.quantity || 1),
-      0
-    );
-
-    setCartItemCount(cartCount);
-  }, []);
+  //   setCartItemCount(cartCount);
+  // }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -104,7 +104,7 @@ const Header = () => {
   return (
     <>
       <nav className="w-full shadow-md bg-white sticky top-0 z-50">
-        <div className="max-w-[1400px] mx-auto px-2 py-4 flex justify-between items-center">
+        <div className="max-w-[1600px] mx-auto px-2 py-4 flex justify-between items-center">
           {/* Logo */}
           <Link
             to="/"
@@ -155,20 +155,17 @@ const Header = () => {
               </button>
               {showCategories && (
                 <div className="absolute top-full left-0 mt-2 w-48 bg-white border shadow-md rounded-md z-50">
-                  {categories?.map((cat) => (
-                    <Link
-                      key={cat._id}
-                      to={`/books/${cat.slug}`}
-                      className={`block px-4 py-2 hover:bg-gray-100 text-sm ${
-                        isActive(`/books/${cat.slug}`)
-                          ? "bg-indigo-50 text-indigo-600"
-                          : "text-gray-700"
-                      }`}
-                      onClick={() => setShowCategories(false)}
-                    >
-                      {cat.name}
-                    </Link>
-                  ))}
+                  <Link
+                    to={`/shop`}
+                    className={`block px-4 py-2 hover:bg-gray-100 text-sm ${
+                      isActive(`/shop`)
+                        ? "bg-indigo-50 text-indigo-600"
+                        : "text-gray-700"
+                    }`}
+                    onClick={() => setShowCategories(false)}
+                  >
+                    {"BOOKS"}
+                  </Link>
                   <Link
                     to={`/ebook`}
                     className={`block px-4 py-2 hover:bg-gray-100 text-sm ${
@@ -238,9 +235,9 @@ const Header = () => {
                     isActive("/cart") ? "text-indigo-600" : ""
                   }`}
                 />
-                {cartItemCount > 0 && (
+                {cartCount > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
-                    {cartItemCount}
+                    {cartCount}
                   </span>
                 )}
               </Link>
@@ -324,7 +321,7 @@ const Header = () => {
                               : "text-gray-700"
                           }`}
                         >
-                          <FaCog /> Setting
+                          <FaCog /> Security
                         </Link>
                       )}
                       <Link

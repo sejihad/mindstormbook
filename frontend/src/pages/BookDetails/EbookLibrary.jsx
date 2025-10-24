@@ -20,28 +20,56 @@ const EbookLibrary = () => {
   }, [dispatch]);
 
   const ebookOrders = orders
-    ?.filter((order) => order.payment?.status === "paid") // paid orders
+    ?.filter((order) => order.payment?.status === "paid")
     .map((order) => {
+      // 🎧 1️⃣ If the order itself is audiobook
       if (order.order_type === "ebook") {
-        // Pure ebook order → 그대로 দেখাও
         return order;
-      } else if (order.order_type === "mixed") {
-        // Mixed order → শুধু ebook items রাখো
+      }
+
+      // 🎧 2️⃣ Mixed order (some audiobooks, some not)
+      else if (order.order_type === "mixed") {
         const ebookItems = order.orderItems?.filter(
           (item) => item.type === "ebook"
         );
-
         if (ebookItems.length > 0) {
           return { ...order, orderItems: ebookItems };
         }
       }
 
-      // baki sob ignore
+      // 🎧 3️⃣ Package order (contains only book IDs)
+      else if (order.order_type === "package") {
+        const packageEbooks = [];
+
+        order.orderItems?.forEach((pkg) => {
+          // ধরো প্রতিটি package item এ আছে: { packageBooks: [bookId1, bookId2, ...] }
+          pkg.books?.forEach((bookId) => {
+            const book = books.find((b) => b._id === bookId);
+
+            // 📌 চেক করছি বইটা audiobook কিনা
+            if (book && book.type === "ebook") {
+              packageEbooks.push({
+                id: book._id,
+                name: book.name,
+                image: book.image?.url || book.cover || "",
+                type: "ebook",
+                fullPdf: book.fullPdf?.url || "",
+                category: book.category,
+                slug: book.slug,
+              });
+            }
+          });
+        });
+
+        if (packageEbooks.length > 0) {
+          return { ...order, orderItems: packageEbooks };
+        }
+      }
+
       return null;
     })
-    .filter(Boolean); // null remove
+    .filter(Boolean);
 
-  console.log(ebookOrders);
   const openPdfViewer = (ebook) => {
     setCurrentEbook(ebook);
     setShowPdf(true);

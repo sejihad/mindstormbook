@@ -1,31 +1,44 @@
 import { ADD_TO_CART, REMOVE_CART_ITEM } from "../constants/cartContants";
 
-export const CartReducer = (state = { CartItems: [] }, action) => {
+export const CartReducer = (
+  state = { CartItems: [], cartCount: 0 },
+  action
+) => {
   switch (action.type) {
-    case ADD_TO_CART:
+    case ADD_TO_CART: {
       const item = action.payload;
-
       const isItemExist = state.CartItems.find((i) => i.id === item.id);
 
+      let updatedCart;
       if (isItemExist) {
-        return {
-          ...state,
-          CartItems: state.CartItems.map((i) =>
-            i.id === isItemExist.id ? item : i
-          ),
-        };
+        updatedCart = state.CartItems.map((i) => (i.id === item.id ? item : i));
       } else {
-        return {
-          ...state,
-          CartItems: [...state.CartItems, item],
-        };
+        updatedCart = [...state.CartItems, item];
       }
 
-    case REMOVE_CART_ITEM:
       return {
         ...state,
-        CartItems: state.CartItems.filter((i) => i.id !== action.payload),
+        CartItems: updatedCart,
+        cartCount: updatedCart.reduce(
+          (total, i) => total + (i.quantity || 1),
+          0
+        ),
       };
+    }
+
+    case REMOVE_CART_ITEM: {
+      const updatedCart = state.CartItems.filter(
+        (i) => i.id !== action.payload
+      );
+      return {
+        ...state,
+        CartItems: updatedCart,
+        cartCount: updatedCart.reduce(
+          (total, i) => total + (i.quantity || 1),
+          0
+        ),
+      };
+    }
 
     default:
       return state;

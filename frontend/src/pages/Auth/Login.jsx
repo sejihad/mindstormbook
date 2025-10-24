@@ -34,7 +34,12 @@ const Login = () => {
   const [registerName, setRegisterName] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
   const [registerPasswordVisible, setRegisterPasswordVisible] = useState(false);
+  const [registerConfirmPasswordVisible, setRegisterConfirmPasswordVisible] =
+    useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [bookTerms, setBookTerms] = useState(false);
 
   const [otp, setOtp] = useState("");
 
@@ -90,10 +95,23 @@ const Login = () => {
 
   const registerSubmit = (e) => {
     e.preventDefault();
+    if (!agreeTerms) {
+      toast.error(
+        "Please agree to the Terms and Conditions before registering."
+      );
+      return;
+    }
+    // Password confirmation check
+    if (registerPassword !== registerConfirmPassword) {
+      return toast.error("Passwords do not match");
+    }
+
     const formData = new FormData();
     formData.set("name", registerName);
     formData.set("email", registerEmail);
     formData.set("password", registerPassword);
+    formData.set("bookTerms", bookTerms);
+
     dispatch(register(formData));
   };
 
@@ -107,7 +125,6 @@ const Login = () => {
     <div className="login-div">
       <div className="form-container">
         {/* OTP Verification Form */}
-
         <div className="form-box otp-verify">
           {otpPending ? (
             <form onSubmit={otpSubmit}>
@@ -177,8 +194,6 @@ const Login = () => {
           )}
         </div>
 
-        {/* Login Form */}
-
         {/* Register Form */}
         <div className="form-box register">
           <form onSubmit={registerSubmit}>
@@ -218,6 +233,54 @@ const Login = () => {
                 {registerPasswordVisible ? "Hide" : "Show"}
               </span>
             </div>
+            <div className="input-box password-box">
+              <input
+                type={registerConfirmPasswordVisible ? "text" : "password"}
+                placeholder="Confirm Password"
+                required
+                value={registerConfirmPassword}
+                onChange={(e) => setRegisterConfirmPassword(e.target.value)}
+              />
+              <span
+                onClick={() =>
+                  setRegisterConfirmPasswordVisible(
+                    !registerConfirmPasswordVisible
+                  )
+                }
+                className="password-toggle"
+              >
+                {registerConfirmPasswordVisible ? "Hide" : "Show"}
+              </span>
+            </div>
+
+            {/* Terms and Conditions Checkbox */}
+            <div className="terms-box">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={bookTerms}
+                  onChange={(e) => setBookTerms(e.target.checked)}
+                  className="checkbox-input"
+                />
+                <span className="checkmark"></span>Would you like a free Sampler
+                Book?
+              </label>
+            </div>
+            <div className="terms-box">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  className="checkbox-input"
+                />
+                <span className="checkmark"></span>I agree to the{" "}
+                <Link to="/terms" className="text-blue-600" target="_blank">
+                  Terms and Conditions
+                </Link>
+              </label>
+            </div>
+
             <button type="submit" className="btn" disabled={loading}>
               {loading ? "Loading..." : "Register"}
             </button>

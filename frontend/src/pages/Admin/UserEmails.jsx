@@ -2,6 +2,7 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import {
   FiCheckCircle,
+  FiClock,
   FiCopy,
   FiMail,
   FiPaperclip,
@@ -35,6 +36,9 @@ const UserEmails = () => {
   const [attachments, setAttachments] = useState([]);
   const [isSending, setIsSending] = useState(false);
 
+  // 24 hours users state
+  const [recentUsers, setRecentUsers] = useState([]);
+
   useEffect(() => {
     dispatch(getAllUsers());
   }, [dispatch]);
@@ -43,16 +47,28 @@ const UserEmails = () => {
     if (users) {
       const userEmails = users
         .filter((user) => user.role === "user")
-        .map((user) => user.email);
+        .map((user) => ({
+          email: user.email,
+          createdAt: user.createdAt,
+          name: user.name,
+        }));
+
       setEmails(userEmails);
       setFilteredEmails(userEmails);
+
+      // 24 hours er users filter korlam
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const recentUsers = userEmails.filter(
+        (user) => new Date(user.createdAt) > twentyFourHoursAgo
+      );
+      setRecentUsers(recentUsers);
     }
   }, [users]);
 
   useEffect(() => {
     if (searchTerm) {
-      const filtered = emails.filter((email) =>
-        email.toLowerCase().includes(searchTerm.toLowerCase())
+      const filtered = emails.filter((user) =>
+        user.email.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredEmails(filtered);
     } else {
@@ -61,7 +77,7 @@ const UserEmails = () => {
   }, [searchTerm, emails]);
 
   const copyAllEmails = () => {
-    const emailString = emails.join(", ");
+    const emailString = emails.map((user) => user.email).join(", ");
     navigator.clipboard
       .writeText(emailString)
       .then(() => {
@@ -87,27 +103,61 @@ const UserEmails = () => {
       });
   };
 
+  // 24 hours er users er email copy korar function
+  const copyRecentEmails = () => {
+    const emailString = recentUsers.map((user) => user.email).join(", ");
+    navigator.clipboard
+      .writeText(emailString)
+      .then(() => {
+        toast.success("Recent users emails copied to clipboard!");
+      })
+      .catch((err) => {
+        toast.error("Failed to copy emails");
+        console.error("Copy failed:", err);
+      });
+  };
+
   // Email Sending Functions
-  const openEmailModal = (specificEmail = null) => {
-    if (specificEmail) {
+  const openEmailModal = (specificUser = null) => {
+    if (specificUser) {
+      // Single user er jonno
       setEmailData({
         subject: "",
         message: "",
-        recipients: [specificEmail],
+        recipients: [specificUser.email], // Shudu matro oi user er email
+        individualMode: true, // Individual mode enable
       });
     } else {
+      // Bulk email er jonno
       setEmailData({
         subject: "",
         message: "",
-        recipients: [...emails], // All emails by default
+        recipients: emails.map((user) => user.email), // Shobai ke
+        individualMode: false, // Bulk mode
       });
     }
     setShowEmailModal(true);
   };
 
+  // 24 hours er users ke email pathanor function
+  const openRecentUsersEmailModal = () => {
+    setEmailData({
+      subject: "",
+      message: "",
+      recipients: recentUsers.map((user) => user.email),
+      individualMode: false,
+    });
+    setShowEmailModal(true);
+  };
+
   const closeEmailModal = () => {
     setShowEmailModal(false);
-    setEmailData({ subject: "", message: "", recipients: [] });
+    setEmailData({
+      subject: "",
+      message: "",
+      recipients: [],
+      individualMode: false,
+    });
     setAttachments([]);
   };
 
@@ -130,7 +180,7 @@ const UserEmails = () => {
   const selectAllRecipients = () => {
     setEmailData((prev) => ({
       ...prev,
-      recipients: [...emails],
+      recipients: emails.map((user) => user.email),
     }));
   };
 
@@ -165,7 +215,7 @@ const UserEmails = () => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Send email function
+  // Send email function - IMPORTANT CHANGE
   const sendEmail = async () => {
     if (
       !emailData.subject ||
@@ -182,8 +232,9 @@ const UserEmails = () => {
       const payload = {
         subject: emailData.subject,
         message: emailData.message,
-        recipients: JSON.stringify(emailData.recipients),
-        attachments: JSON.stringify(attachments),
+        recipients: emailData.recipients, // Array of emails
+        individualMode: emailData.individualMode, // Individual mode flag
+        attachments: attachments,
       };
 
       const token = localStorage.getItem("token");
@@ -204,7 +255,7 @@ const UserEmails = () => {
           `Email sent to ${emailData.recipients.length} recipients successfully!`
         );
         closeEmailModal();
-        setAttachments([]); // clear attachments
+        setAttachments([]);
       } else {
         throw new Error(data.message || "Failed to send email");
       }
@@ -248,6 +299,16 @@ const UserEmails = () => {
               </div>
             </div>
 
+            <div className="bg-white rounded-xl shadow-md p-4 flex items-center">
+              <div className="bg-blue-100 p-3 rounded-full mr-4">
+                <FiClock className="text-blue-600 text-xl" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Last 24 Hours</p>
+                <p className="text-xl font-bold">{recentUsers.length}</p>
+              </div>
+            </div>
+
             <div className="bg-white rounded-xl shadow-md p-4">
               <button
                 onClick={copyAllEmails}
@@ -288,6 +349,35 @@ const UserEmails = () => {
             </div>
           </div>
 
+          {/* Additional Action Buttons */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <button
+              onClick={copyRecentEmails}
+              disabled={recentUsers.length === 0}
+              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg transition-colors ${
+                recentUsers.length === 0
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
+            >
+              <FiCopy size={18} />
+              Copy Recent 24h Users ({recentUsers.length})
+            </button>
+
+            <button
+              onClick={openRecentUsersEmailModal}
+              disabled={recentUsers.length === 0}
+              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg transition-colors ${
+                recentUsers.length === 0
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-orange-600 hover:bg-orange-700 text-white"
+              }`}
+            >
+              <FiSend size={18} />
+              Email Recent 24h Users
+            </button>
+          </div>
+
           {/* Search and Email List */}
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
@@ -320,19 +410,24 @@ const UserEmails = () => {
                   <span>Actions</span>
                 </div>
                 <div className="email-list">
-                  {filteredEmails.map((email, index) => (
+                  {filteredEmails.map((user, index) => (
                     <div key={index} className="email-item">
-                      <span className="email-text">{email}</span>
+                      <div>
+                        <span className="email-text">{user.email}</span>
+                        {user.name && (
+                          <p className="text-xs text-gray-500">{user.name}</p>
+                        )}
+                      </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => copyEmail(email)}
+                          onClick={() => copyEmail(user.email)}
                           className="copy-btn"
                           title="Copy email"
                         >
                           <FiCopy size={16} />
                         </button>
                         <button
-                          onClick={() => openEmailModal(email)}
+                          onClick={() => openEmailModal(user)}
                           className="send-btn"
                           title="Send email to this user"
                         >
@@ -361,9 +456,18 @@ const UserEmails = () => {
             {/* Modal Header */}
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-600 p-6">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-white">
-                  Send Email to Users
-                </h2>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {emailData.individualMode
+                      ? "Send Email to User"
+                      : "Send Email to Users"}
+                  </h2>
+                  <p className="text-indigo-100 text-sm mt-1">
+                    {emailData.individualMode
+                      ? "This email will be sent individually"
+                      : `Sending to ${emailData.recipients.length} recipients (each will see only their own email)`}
+                  </p>
+                </div>
                 <button
                   onClick={closeEmailModal}
                   className="text-white hover:text-gray-200 transition-colors"
@@ -375,44 +479,63 @@ const UserEmails = () => {
 
             {/* Modal Content */}
             <div className="p-6 max-h-[60vh] overflow-y-auto">
-              {/* Recipients Selection */}
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-3">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Recipients ({emailData.recipients.length} selected)
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={selectAllRecipients}
-                      className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
-                    >
-                      Select All
-                    </button>
-                    <button
-                      onClick={clearAllRecipients}
-                      className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
-                    >
-                      Clear All
-                    </button>
+              {/* Recipients Selection - Only show for bulk mode */}
+              {!emailData.individualMode && (
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Recipients ({emailData.recipients.length} selected)
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={selectAllRecipients}
+                        className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={clearAllRecipients}
+                        className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
+                  <div className="border border-gray-300 rounded-lg p-3 max-h-32 overflow-y-auto">
+                    {emails.map((user) => (
+                      <label
+                        key={user.email}
+                        className="flex items-center gap-2 mb-2 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={emailData.recipients.includes(user.email)}
+                          onChange={() => handleRecipientToggle(user.email)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-sm">{user.email}</span>
+                        {user.name && (
+                          <span className="text-xs text-gray-500">
+                            ({user.name})
+                          </span>
+                        )}
+                      </label>
+                    ))}
                   </div>
                 </div>
-                <div className="border border-gray-300 rounded-lg p-3 max-h-32 overflow-y-auto">
-                  {emails.map((email) => (
-                    <label
-                      key={email}
-                      className="flex items-center gap-2 mb-2 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={emailData.recipients.includes(email)}
-                        onChange={() => handleRecipientToggle(email)}
-                        className="rounded text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <span className="text-sm">{email}</span>
-                    </label>
-                  ))}
+              )}
+
+              {/* Individual mode e shudu email show korbo */}
+              {emailData.individualMode && (
+                <div className="mb-6 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <strong>Recipient:</strong> {emailData.recipients[0]}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    This email will be sent individually
+                  </p>
                 </div>
-              </div>
+              )}
 
               {/* Subject */}
               <div className="mb-4">
@@ -524,7 +647,9 @@ const UserEmails = () => {
                 ) : (
                   <>
                     <FiSend />
-                    Send Email
+                    {emailData.individualMode
+                      ? "Send Email"
+                      : `Send to ${emailData.recipients.length} Users`}
                   </>
                 )}
               </button>

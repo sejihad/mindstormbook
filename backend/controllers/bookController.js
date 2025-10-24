@@ -637,7 +637,7 @@ const getBookCart = catchAsyncErrors(async (req, res, next) => {
 
 // Create New Review or Update the review
 const createBookReview = catchAsyncErrors(async (req, res, next) => {
-  const { rating, comment, bookId } = req.body;
+  const { rating, comment, bookId, name } = req.body;
 
   let reviewImage;
   if (req.files && req.files.image) {
@@ -662,7 +662,7 @@ const createBookReview = catchAsyncErrors(async (req, res, next) => {
 
   const review = {
     user: req.user._id,
-    name: req.user.role === "admin" ? "Admin" : req.user.name,
+    name: req.user.role === "admin" ? name : req.user.name,
     rating: Number(rating),
     comment,
     reviewImage,
@@ -685,7 +685,7 @@ const createBookReview = catchAsyncErrors(async (req, res, next) => {
 });
 
 const updateBookReview = catchAsyncErrors(async (req, res, next) => {
-  const { rating, comment } = req.body;
+  const { rating, comment, name } = req.body;
   const { reviewId } = req.params;
 
   const book = await Book.findOne({ "reviews._id": reviewId });
@@ -724,7 +724,7 @@ const updateBookReview = catchAsyncErrors(async (req, res, next) => {
 
   review.rating = Number(rating);
   review.comment = comment;
-  if (req.user.role === "admin") review.name = "Admin";
+  if (req.user.role === "admin") review.name = name;
   review.updatedAt = Date.now();
 
   const totalRating = book.reviews.reduce((acc, rev) => acc + rev.rating, 0);

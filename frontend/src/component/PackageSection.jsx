@@ -6,7 +6,7 @@ import {
   FaStar,
   FaStarHalfAlt,
 } from "react-icons/fa";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import slugify from "slugify";
@@ -34,8 +34,27 @@ const StarRating = ({ rating }) => {
 const PackageSection = ({ title, packages, loading }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-
+  const { user } = useSelector((state) => state.user);
   const handleBuyNow = (item) => {
+    if (!user) {
+      toast.error("Please login to continue");
+      navigate("/login");
+      return;
+    }
+    if (!user?.country || !user?.number) {
+      toast.info("Please complete your profile before checkout");
+      navigate("/profile/update", {
+        state: {
+          from: "/checkout",
+          checkoutState: {
+            cartItems: [item],
+            type: "package",
+          },
+        },
+      });
+      return;
+    }
+
     navigate("/checkout", {
       state: {
         cartItems: [item],
@@ -90,7 +109,7 @@ const PackageSection = ({ title, packages, loading }) => {
                       <img
                         src={pkg.image?.url}
                         alt={pkg.name}
-                        className="w-full h-48 object-cover"
+                        className="w-full h-75 object-cover"
                         loading="lazy"
                       />
                     </Link>

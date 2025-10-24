@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   FaBox,
   FaCheckCircle,
@@ -10,6 +10,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import { getBook } from "../../actions/bookAction";
 import { clearErrors, getOrderDetails } from "../../actions/orderAction";
 import Loader from "../../component/layout/Loader/Loader";
 import MetaData from "../../component/layout/MetaData";
@@ -19,6 +20,9 @@ const OrderDetails = () => {
   const { id } = useParams();
 
   const { order, loading, error } = useSelector((state) => state.orderDetails);
+  const { books } = useSelector((state) => state.books);
+  const [booksData, setBooksData] = useState({});
+  const [isLoadingBooks, setIsLoadingBooks] = useState(false);
 
   useEffect(() => {
     dispatch(getOrderDetails(id));
@@ -30,6 +34,69 @@ const OrderDetails = () => {
       dispatch(clearErrors());
     }
   }, [dispatch, error]);
+
+  // Fetch books data for packages
+  useEffect(() => {
+    const fetchBooksForPackages = async () => {
+      if (!order || !order.orderItems) return;
+
+      const packageItems = order.orderItems.filter(
+        (item) => item.type === "package" && item.books && item.books.length > 0
+      );
+
+      if (packageItems.length === 0) return;
+
+      setIsLoadingBooks(true);
+      try {
+        // Fetch all books
+        await dispatch(getBook());
+      } catch (error) {
+        console.error("Error fetching books:", error);
+      } finally {
+        setIsLoadingBooks(false);
+      }
+    };
+
+    fetchBooksForPackages();
+  }, [order, dispatch]);
+
+  // Process books data when books are loaded
+  useEffect(() => {
+    if (books.length > 0) {
+      const bookMap = {};
+      books.forEach((book) => {
+        bookMap[book._id] = book;
+      });
+      setBooksData(bookMap);
+    }
+  }, [books]);
+
+  // Function to get book name by ID
+  const getBookName = (bookId) => {
+    if (isLoadingBooks) return "Loading...";
+    return booksData[bookId]?.name || "Book not found";
+  };
+
+  // Function to render book names for packages
+  const renderBookNames = (item) => {
+    if (item.type === "package" && item.books && item.books.length > 0) {
+      return (
+        <div className="mt-2">
+          <p className="text-xs text-gray-500 mb-1">
+            Includes {item.books.length} book{item.books.length > 1 ? "s" : ""}:
+          </p>
+          <div className="max-h-20 overflow-y-auto">
+            {item.books.map((bookId, index) => (
+              <p key={index} className="text-xs text-gray-600 truncate">
+                • {getBookName(bookId)}
+              </p>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   const getStatusIcon = (status) => {
     switch (status?.toLowerCase()) {
@@ -172,8 +239,8 @@ const OrderDetails = () => {
               </div>
 
               {/* Shipping Info - Only show for non-ebook orders */}
-              {order.order_type !== "ebook" ||
-                ("audiobook" && (
+              {order.order_type !== "ebook" &&
+                order.order_type !== "audiobook" && (
                   <div>
                     <h3 className="text-lg font-medium text-gray-900 mb-4">
                       Shipping Information
@@ -205,7 +272,7 @@ const OrderDetails = () => {
                       </p>
                     </div>
                   </div>
-                ))}
+                )}
             </div>
 
             {/* Payment Info */}
@@ -222,13 +289,13 @@ const OrderDetails = () => {
                   <span className="font-medium">Items Price:</span> $
                   {order.itemsPrice?.toFixed(2)}
                 </p>
-                {order.order_type !== "ebook" ||
-                  ("audiobook" && (
+                {order.order_type !== "ebook" &&
+                  order.order_type !== "audiobook" && (
                     <p className="text-gray-700">
                       <span className="font-medium">Shipping Price:</span> $
                       {order.shippingPrice?.toFixed(2)}
                     </p>
-                  ))}
+                  )}
                 <p className="text-gray-700 font-bold">
                   <span className="font-medium">Total Paid:</span> $
                   {order.totalPrice?.toFixed(2)}
@@ -236,7 +303,6 @@ const OrderDetails = () => {
               </div>
             </div>
 
-            {/* Order Items */}
             {/* Order Items */}
             <div className="p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -279,9 +345,9 @@ const OrderDetails = () => {
                               <div className="text-sm font-medium text-gray-900">
                                 {item.name}
                               </div>
-                              <div className="text-sm text-gray-500">
-                                {item.id}
-                              </div>
+
+                              {/* Show books included for packages */}
+                              {renderBookNames(item)}
                             </div>
                           </div>
                         </td>
@@ -289,7 +355,7 @@ const OrderDetails = () => {
                           <span
                             className={`px-2 py-1 text-xs font-semibold rounded-full 
                 ${
-                  item.type === "ebook" || "audiobook"
+                  item.type === "ebook" || item.type === "audiobook"
                     ? "bg-purple-100 text-purple-800"
                     : item.type === "book"
                     ? "bg-blue-100 text-blue-800"

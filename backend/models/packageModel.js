@@ -1,51 +1,6 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
 
-// Book Subdocument Schema
-const BookSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, "Please enter book name"],
-    trim: true,
-  },
-
-  writer: {
-    type: String,
-    required: [true, "Please enter writer name"],
-  },
-
-  language: {
-    type: String,
-    default: "Bangla",
-  },
-  publisher: {
-    type: String,
-    default: null,
-  },
-  publishDate: {
-    type: Date,
-    default: null,
-  },
-
-  isbn13: {
-    type: String,
-  },
-  demoPdf: {
-    public_id: {
-      type: String,
-      default: null,
-    },
-    url: {
-      type: String,
-      default: null,
-    },
-  },
-  category: {
-    type: String,
-    required: [true, "Please enter book category"],
-  },
-});
-
 const PackageSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -148,7 +103,13 @@ const PackageSchema = new mongoose.Schema({
   },
 
   // Three Books Embedded
-  books: [BookSchema],
+  books: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Book",
+      required: true,
+    },
+  ],
 });
 
 PackageSchema.pre("save", function (next) {

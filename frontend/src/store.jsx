@@ -124,12 +124,20 @@ const rootReducer = combineReducers({
 
 // Create persisted reducer
 const persistedReducer = persistReducer(persistConfig, rootReducer);
+const cartItemsFromStorage = localStorage.getItem("CartItems")
+  ? JSON.parse(localStorage.getItem("CartItems"))
+  : [];
+
+// 2️⃣ Compute the count
+const cartCountFromStorage = cartItemsFromStorage.reduce(
+  (total, item) => total + (item.quantity || 1),
+  0
+);
 
 let initialState = {
   Cart: {
-    CartItems: localStorage.getItem("CartItems")
-      ? JSON.parse(localStorage.getItem("CartItems"))
-      : [],
+    CartItems: cartItemsFromStorage,
+    cartCount: cartCountFromStorage,
   },
 };
 

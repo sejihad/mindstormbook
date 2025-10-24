@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { FiArrowLeft, FiEdit, FiPlus, FiTrash2, FiX } from "react-icons/fi";
+import {
+  FiArrowLeft,
+  FiEdit,
+  FiPlus,
+  FiTrash2,
+  FiUser,
+  FiX,
+} from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -54,6 +61,7 @@ const Reviews = () => {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [editingReview, setEditingReview] = useState(null);
   const [review, setReview] = useState({
+    name: "", // Name field add korlam
     rating: 0,
     comment: "",
     image: null,
@@ -128,6 +136,7 @@ const Reviews = () => {
 
   const resetReviewForm = () => {
     setReview({
+      name: "", // Reset korlam
       rating: 0,
       comment: "",
     });
@@ -162,12 +171,14 @@ const Reviews = () => {
       return;
     }
 
-    if (review.rating === 0 || !review.comment.trim()) {
-      toast.error("Please provide both rating and comment");
+    // Validation with name field
+    if (!review.name.trim() || review.rating === 0 || !review.comment.trim()) {
+      toast.error("Please provide name, rating and comment");
       return;
     }
 
     const formData = new FormData();
+    formData.append("name", review.name.trim()); // Name add korlam
     formData.append("rating", review.rating);
     formData.append("comment", review.comment);
     formData.append("bookId", id);
@@ -192,6 +203,7 @@ const Reviews = () => {
   const handleEditReview = (review) => {
     setEditingReview(review);
     setReview({
+      name: review.name || "", // Edit korar somoy name set korlam
       rating: review.rating,
       comment: review.comment,
     });
@@ -248,6 +260,29 @@ const Reviews = () => {
                 {editingReview ? "Edit Review" : "Write a Review"}
               </h3>
               <div className="space-y-4">
+                {/* Name Field Add Korlam */}
+                <div>
+                  <label className="block text-gray-700 mb-2 font-medium">
+                    Your Name *
+                  </label>
+                  <div className="relative">
+                    <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={review.name}
+                      onChange={(e) =>
+                        setReview({ ...review, name: e.target.value })
+                      }
+                      className="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Enter your name"
+                      maxLength={50}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {review.name.length}/50 characters
+                  </p>
+                </div>
+
                 <div>
                   <label className="block text-gray-700 mb-2 font-medium">
                     Your Rating *
@@ -270,7 +305,11 @@ const Reviews = () => {
                     }
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     placeholder="Share your thoughts about this book..."
+                    maxLength={500}
                   ></textarea>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {review.comment.length}/500 characters
+                  </p>
                 </div>
 
                 {/* Image Upload */}
@@ -313,7 +352,11 @@ const Reviews = () => {
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <button
                     onClick={submitReview}
-                    disabled={review.rating === 0 || !review.comment.trim()}
+                    disabled={
+                      !review.name.trim() ||
+                      review.rating === 0 ||
+                      !review.comment.trim()
+                    }
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
                   >
                     {editingReview ? "Update Review" : "Submit Review"}
@@ -354,7 +397,8 @@ const Reviews = () => {
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex-1">
                             <h3 className="font-semibold text-gray-900 text-base">
-                              {review?.name || "Deleted User"}
+                              {review?.name || "Anonymous"}{" "}
+                              {/* Name show korlam */}
                             </h3>
                             <div className="flex items-center mt-1">
                               <StarRating rating={review.rating} />
@@ -404,7 +448,7 @@ const Reviews = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        User
+                        Name
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Rating
@@ -428,7 +472,8 @@ const Reviews = () => {
                       >
                         <td className="px-4 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
-                            {review?.name || "Deleted User"}
+                            {review?.name || "Anonymous"}{" "}
+                            {/* Name show korlam */}
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">

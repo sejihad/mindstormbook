@@ -32,8 +32,6 @@ const Shop = () => {
   const { loading, books } = useSelector((state) => state.books);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const booksPerPage = 15;
 
   const query = useQuery();
 
@@ -54,14 +52,6 @@ const Shop = () => {
       book.type.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const indexOfLastBook = currentPage * booksPerPage;
-  const indexOfFirstBook = indexOfLastBook - booksPerPage;
-  const currentBooks = filteredBooks.slice(indexOfFirstBook, indexOfLastBook);
-
-  const totalPages = Math.ceil(filteredBooks.length / booksPerPage);
-
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
   return (
     <section className="container min-h-screen mx-auto px-4 py-8">
       {/* <h2 className="text-2xl font-bold text-gray-800 mb-6">All Books</h2> */}
@@ -74,26 +64,7 @@ const Shop = () => {
       ) : (
         <>
           {/* ✅ BookSection এ currentBooks পাঠানো */}
-          <BookSection title="All " books={currentBooks} loading={loading} />
-
-          {/* Pagination */}
-          <div className="flex justify-center mt-10">
-            <div className="flex space-x-2">
-              {[...Array(totalPages).keys()].map((num) => (
-                <button
-                  key={num + 1}
-                  onClick={() => paginate(num + 1)}
-                  className={`px-3 py-1 rounded-md border text-sm font-medium ${
-                    currentPage === num + 1
-                      ? "bg-green-500 text-white"
-                      : "bg-white text-gray-700"
-                  }`}
-                >
-                  {num + 1}
-                </button>
-              ))}
-            </div>
-          </div>
+          <BookSection title="All " books={filteredBooks} loading={loading} />
         </>
       )}
     </section>

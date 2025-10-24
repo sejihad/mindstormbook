@@ -1,7 +1,7 @@
 // components/admin/ShippingManager.jsx
 import { Country } from "country-state-city";
 import { useEffect, useState } from "react";
-import { FiEdit2, FiPlus, FiTrash2, FiX } from "react-icons/fi";
+import { FiEdit2, FiGlobe, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import {
@@ -38,10 +38,43 @@ const AllShips = () => {
   // Get all countries from the library
   const allCountries = Country.getAllCountries();
 
-  // Filter out countries that already have shipping charges
-  const availableCountries = allCountries.filter(
-    (countryObj) => !ships?.some((ship) => ship.country === countryObj.name)
+  // Custom sort function to prioritize specific countries
+  const sortCountries = (countries) => {
+    const priorityCountries = ["United States", "Canada", "Mexico"];
+
+    return countries.sort((a, b) => {
+      const aIsPriority = priorityCountries.includes(a.name);
+      const bIsPriority = priorityCountries.includes(b.name);
+
+      if (aIsPriority && !bIsPriority) return -1;
+      if (!aIsPriority && bIsPriority) return 1;
+      if (aIsPriority && bIsPriority) {
+        return (
+          priorityCountries.indexOf(a.name) - priorityCountries.indexOf(b.name)
+        );
+      }
+
+      // For non-priority countries, sort alphabetically
+      return a.name.localeCompare(b.name);
+    });
+  };
+
+  // Filter out countries that already have shipping charges and apply custom sort
+  const availableCountries = sortCountries(
+    allCountries.filter(
+      (countryObj) => !ships?.some((ship) => ship.country === countryObj.name)
+    )
   );
+
+  // Add "All Countries" option at the beginning
+  const countriesWithAllOption = [
+    {
+      name: "All Countries",
+      isoCode: "ALL",
+      flag: "🌍",
+    },
+    ...availableCountries,
+  ];
 
   useEffect(() => {
     dispatch(getAdminShips());
@@ -110,11 +143,24 @@ const AllShips = () => {
     if (editId) {
       dispatch(updateShip(editId, formData));
     } else {
-      // Check if country already exists (shouldn't happen due to filtered dropdown)
+      // Check if country already exists
       if (ships.some((ship) => ship.country === country)) {
         return toast.error("This country already has a shipping charge");
       }
-      dispatch(createShip(formData));
+
+      // Handle "All Countries" case - create only one entry for "All Countries"
+      if (country === "All Countries") {
+        // Check if "All Countries" already exists
+        if (ships.some((ship) => ship.country === "All Countries")) {
+          return toast.error("'All Countries' shipping charge already exists");
+        }
+
+        // Create only one entry for "All Countries"
+        dispatch(createShip(formData));
+      } else {
+        // Normal single country case
+        dispatch(createShip(formData));
+      }
     }
   };
 
@@ -178,18 +224,29 @@ const AllShips = () => {
                     value={country}
                     onChange={(e) => setCountry(e.target.value)}
                     required
-                    disabled={editId !== null} // Disable country selection when editing
-                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                      editId ? "bg-gray-100 cursor-not-allowed" : ""
+                    disabled={editId !== null}
+                    className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
+                      editId
+                        ? "bg-gray-100 cursor-not-allowed"
+                        : "hover:border-gray-400"
                     }`}
                   >
                     <option value="">Select a country</option>
                     {editId ? (
                       <option value={country}>{country}</option>
                     ) : (
-                      availableCountries.map((country) => (
-                        <option key={country.isoCode} value={country.name}>
-                          {country.name}
+                      countriesWithAllOption.map((countryObj) => (
+                        <option
+                          key={countryObj.isoCode}
+                          value={countryObj.name}
+                          className={
+                            countryObj.name === "All Countries"
+                              ? "font-semibold text-indigo-600 border-t border-gray-200 my-1"
+                              : ""
+                          }
+                        >
+                          {countryObj.name}
+                          {countryObj.flag && ` ${countryObj.flag}`}
                         </option>
                       ))
                     )}
@@ -198,6 +255,13 @@ const AllShips = () => {
                     <p className="text-xs text-gray-500 mt-1">
                       Country cannot be changed when editing. Delete and
                       recreate if needed.
+                    </p>
+                  )}
+                  {country === "All Countries" && (
+                    <p className="text-xs text-blue-600 mt-1 flex items-center">
+                      <FiGlobe className="mr-1" />
+                      This will create a single shipping charge entry for "All
+                      Countries"
                     </p>
                   )}
                 </div>
@@ -215,17 +279,17 @@ const AllShips = () => {
                     step="0.01"
                     value={charge}
                     onChange={(e) => setCharge(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors hover:border-gray-400"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`w-full py-3 px-4 cursor-pointer rounded-lg text-white font-semibold flex items-center justify-center gap-2 ${
+                  className={`w-full py-3 px-4 cursor-pointer rounded-lg text-white font-semibold flex items-center justify-center gap-2 transition-all ${
                     loading
                       ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-indigo-600 hover:bg-indigo-700"
+                      : "bg-indigo-600 hover:bg-indigo-700 hover:shadow-md"
                   }`}
                 >
                   {loading ? (
@@ -278,9 +342,22 @@ const AllShips = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {ships?.map((charge) => (
-                      <tr key={charge._id}>
+                      <tr
+                        key={charge._id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {charge.country}
+                          <div className="flex items-center">
+                            {charge.country === "All Countries" && (
+                              <FiGlobe className="mr-2 text-indigo-500" />
+                            )}
+                            {charge.country}
+                            {charge.country === "All Countries" && (
+                              <span className="ml-2 bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded-full">
+                                Global
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           ${charge.charge.toFixed(2)}
@@ -289,14 +366,14 @@ const AllShips = () => {
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleEdit(charge)}
-                              className="p-2 text-indigo-600 hover:bg-indigo-50 cursor-pointer rounded-full transition-colors"
+                              className="p-2 text-indigo-600 hover:bg-indigo-50 cursor-pointer rounded-full transition-colors hover:shadow-sm"
                               title="Edit"
                             >
                               <FiEdit2 size={18} />
                             </button>
                             <button
                               onClick={() => handleDelete(charge._id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors cursor-pointer"
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors cursor-pointer hover:shadow-sm"
                               title="Delete"
                             >
                               <FiTrash2 size={18} />

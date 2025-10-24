@@ -12,6 +12,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import { getBook } from "../../actions/bookAction";
 import {
   clearErrors,
   getAdminOrderDetails,
@@ -26,9 +27,12 @@ const AdminOrderDetails = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [status, setStatus] = useState("");
+  const [booksData, setBooksData] = useState({});
+  const [isLoadingBooks, setIsLoadingBooks] = useState(false);
 
   const { order, loading, error } = useSelector((state) => state.orderDetails);
   const { isUpdated, error: updateError } = useSelector((state) => state.order);
+  const { books } = useSelector((state) => state.books);
 
   useEffect(() => {
     dispatch(getAdminOrderDetails(id));
@@ -49,6 +53,68 @@ const AdminOrderDetails = () => {
       navigate("/admin/orders");
     }
   }, [dispatch, error, updateError, isUpdated, navigate]);
+
+  // Package-এর বইগুলো fetch করা
+  useEffect(() => {
+    const fetchBooksForPackages = async () => {
+      if (!order || !order.orderItems) return;
+
+      const packageItems = order.orderItems.filter(
+        (item) => item.type === "package" && item.books && item.books.length > 0
+      );
+
+      if (packageItems.length === 0) return;
+
+      setIsLoadingBooks(true);
+      try {
+        await dispatch(getBook());
+      } catch (error) {
+        console.error("Error fetching books:", error);
+      } finally {
+        setIsLoadingBooks(false);
+      }
+    };
+
+    fetchBooksForPackages();
+  }, [order, dispatch]);
+
+  // Books data process করা
+  useEffect(() => {
+    if (books.length > 0) {
+      const bookMap = {};
+      books.forEach((book) => {
+        bookMap[book._id] = book;
+      });
+      setBooksData(bookMap);
+    }
+  }, [books]);
+
+  // Function to get book name by ID
+  const getBookName = (bookId) => {
+    if (isLoadingBooks) return "Loading...";
+    return booksData[bookId]?.name || "Book not found";
+  };
+
+  // Function to render book names for packages in UI
+  const renderBookNames = (item) => {
+    if (item.type === "package" && item.books && item.books.length > 0) {
+      return (
+        <div className="mt-2">
+          <p className="text-xs text-gray-500 mb-1">
+            Includes {item.books.length} book{item.books.length > 1 ? "s" : ""}:
+          </p>
+          <div className="max-h-20 overflow-y-auto">
+            {item.books.map((bookId, index) => (
+              <p key={index} className="text-xs text-gray-600 truncate">
+                • {getBookName(bookId)}
+              </p>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   const getStatusIcon = (status) => {
     switch (status?.toLowerCase()) {
@@ -143,7 +209,11 @@ const AdminOrderDetails = () => {
     }
 
     // Shipping information (for non-ebook orders)
-    if (order.order_type !== "ebook" || ("audiobook" && order.shippingInfo)) {
+    if (
+      order.order_type !== "ebook" &&
+      order.order_type !== "audiobook" &&
+      order.shippingInfo
+    ) {
       doc.setFontSize(12);
       doc.text("SHIPPING INFORMATION", 20, 121);
       doc.setFontSize(10);
@@ -155,18 +225,32 @@ const AdminOrderDetails = () => {
       doc.text(`Phone: ${order.shippingInfo.phone}`, 20, 152);
     }
 
-    // Order items table
-    autoTable(doc, {
-      head: [["Product", "Type", "Price", "Qty", "Subtotal"]],
-      body: order.orderItems.map((item) => [
-        item.name,
-        item.type, // Add type column
+    // Order items table - UPDATED FOR PACKAGES
+    const tableBody = order.orderItems.map((item) => {
+      let productName = item.name;
+
+      // Package হলে বইগুলোর নাম যোগ করুন
+      if (item.type === "package" && item.books && item.books.length > 0) {
+        const bookNames = item.books
+          .map((bookId) => getBookName(bookId))
+          .join(", ");
+        productName = `${item.name}\n(Includes: ${bookNames})`;
+      }
+
+      return [
+        productName,
+        item.type,
         `$${item.price.toFixed(2)}`,
         item.quantity,
         `$${(item.price * item.quantity).toFixed(2)}`,
-      ]),
+      ];
+    });
+
+    autoTable(doc, {
+      head: [["Product", "Type", "Price", "Qty", "Subtotal"]],
+      body: tableBody,
       startY:
-        order.order_type === "ebook" || "audiobook"
+        order.order_type === "ebook" || order.order_type === "audiobook"
           ? order.user?.country
             ? 165
             : 160
@@ -180,8 +264,18 @@ const AdminOrderDetails = () => {
       alternateRowStyles: {
         fillColor: [245, 245, 245],
       },
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.25,
+      },
       columnStyles: {
-        1: { cellWidth: 20 }, // Adjust width for type column
+        0: { cellWidth: 60 }, // Product column wider for package info
+        1: { cellWidth: 25 }, // Type column
+        2: { cellWidth: 20 }, // Price column
+        3: { cellWidth: 15 }, // Quantity column
+        4: { cellWidth: 25 }, // Subtotal column
       },
     });
 
@@ -190,7 +284,7 @@ const AdminOrderDetails = () => {
     doc.setFontSize(10);
     doc.text(`Items Price: $${order.itemsPrice?.toFixed(2)}`, 150, summaryY);
 
-    if (order.order_type !== "ebook" || "audiobook") {
+    if (order.order_type !== "ebook" && order.order_type !== "audiobook") {
       doc.text(
         `Shipping Price: $${order.shippingPrice?.toFixed(2)}`,
         150,
@@ -203,7 +297,10 @@ const AdminOrderDetails = () => {
     doc.text(
       `Total Price: $${order.totalPrice?.toFixed(2)}`,
       150,
-      summaryY + (order.order_type !== "ebook" || "audiobook" ? 15 : 10)
+      summaryY +
+        (order.order_type !== "ebook" && order.order_type !== "audiobook"
+          ? 15
+          : 10)
     );
     doc.setFont(undefined, "normal");
 
@@ -353,8 +450,9 @@ const AdminOrderDetails = () => {
             </div>
 
             {/* Shipping Info - Only show for non-ebook orders */}
-            {order.order_type !== "ebook" ||
-              ("audiobook" && order.shippingInfo && (
+            {order.order_type !== "ebook" &&
+              order.order_type !== "audiobook" &&
+              order.shippingInfo && (
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
                     Shipping Information
@@ -386,7 +484,7 @@ const AdminOrderDetails = () => {
                     </p>
                   </div>
                 </div>
-              ))}
+              )}
           </div>
 
           {/* Payment Info */}
@@ -403,13 +501,13 @@ const AdminOrderDetails = () => {
                 <span className="font-medium">Items Price:</span> $
                 {order.itemsPrice?.toFixed(2)}
               </p>
-              {order.order_type !== "ebook" ||
-                ("audiobook" && (
+              {order.order_type !== "ebook" &&
+                order.order_type !== "audiobook" && (
                   <p className="text-gray-700">
                     <span className="font-medium">Shipping Price:</span> $
                     {order.shippingPrice?.toFixed(2)}
                   </p>
-                ))}
+                )}
               <p className="text-gray-700 font-bold">
                 <span className="font-medium">Total Paid:</span> $
                 {order.totalPrice?.toFixed(2)}
@@ -424,7 +522,6 @@ const AdminOrderDetails = () => {
             </h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                {/* Order Items Table */}
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -463,19 +560,22 @@ const AdminOrderDetails = () => {
                             <div className="text-sm text-gray-500">
                               {item.id}
                             </div>
+
+                            {/* Package-এর বইগুলোর নাম দেখানো */}
+                            {renderBookNames(item)}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 py-1 text-xs font-semibold rounded-full 
-    ${
-      item.type === "ebook" || "audiobook"
-        ? "bg-purple-100 text-purple-800"
-        : item.type === "book"
-        ? "bg-blue-100 text-blue-800"
-        : "bg-orange-100 text-orange-800"
-    }`}
+                            ${
+                              item.type === "ebook" || item.type === "audiobook"
+                                ? "bg-purple-100 text-purple-800"
+                                : item.type === "book"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-orange-100 text-orange-800"
+                            }`}
                         >
                           {item.type}
                         </span>
@@ -497,36 +597,35 @@ const AdminOrderDetails = () => {
           </div>
 
           {/* Update Order Section - Only show for non-ebook orders */}
-          {order.order_type !== "ebook" ||
-            ("audiobook" && (
-              <div className="p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Update Order Status
-                </h3>
-                <form onSubmit={updateOrderHandler}>
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    >
-                      <option value="">Select Status</option>
-                      <option value="pending">Pending</option>
-                      <option value="in progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Update Status
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ))}
+          {order.order_type !== "ebook" && order.order_type !== "audiobook" && (
+            <div className="p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Update Order Status
+              </h3>
+              <form onSubmit={updateOrderHandler}>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  >
+                    <option value="">Select Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="in progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Update Status
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       </div>
     </div>
