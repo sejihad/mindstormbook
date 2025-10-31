@@ -95,8 +95,10 @@ const rootReducer = combineReducers({
   book: bookReducer,
   bookDetails: bookDetailsReducer,
   bookAdminDetails: bookAdminDetailsReducer,
+
   newReview: newReviewReducer,
   reviewUpdate: reviewUpdateReducer,
+
   packages: packagesReducer,
   newPackage: newPackageReducer,
   package: packageReducer,

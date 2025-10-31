@@ -145,7 +145,7 @@ const PackageSection = ({ title, packages, loading }) => {
                       <div className="flex items-center">
                         <FaBook className="mr-2 text-blue-500 flex-shrink-0" />
                         <span className="line-clamp-1">
-                          {Object.keys(pkg.books || {}).length} books included
+                          {(pkg.books || []).length} books included
                         </span>
                       </div>
                       <div className="flex items-center">
