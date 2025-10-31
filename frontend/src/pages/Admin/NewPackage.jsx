@@ -139,12 +139,12 @@ const NewPackage = () => {
     data.set("deliverToCountries", formData.deliverToCountries);
     if (formData.videoLink) data.set("videoLink", formData.videoLink);
 
-    // Books data - only IDs
+    // ✅ CHANGE HERE: Books data - array notation ব্যবহার করুন
     formData.books.forEach((bookId) => {
-      data.append("books", bookId);
+      data.append("books[]", bookId); // শুধু এখানে change
     });
 
-    // Images
+    // Images (একই থাকবে)
     if (image) data.append("image", image);
     images.forEach((img) => {
       data.append("images", img);

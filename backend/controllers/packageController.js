@@ -24,18 +24,32 @@ const createPackage = catchAsyncErrors(async (req, res, next) => {
     }
   }
 
-  // Validate books array
   let books = req.body.books;
-  if (!Array.isArray(books) || books.length === 0) {
-    return next(new ErrorHandler("At least one book ID is required", 400));
+
+  // যদি array notation এ data আসে (books[]=id1&books[]=id2)
+  if (req.body["books[]"]) {
+    books = Array.isArray(req.body["books[]"])
+      ? req.body["books[]"]
+      : [req.body["books[]"]];
   }
 
-  // Optional: Ensure all items are valid ObjectIds
-  books = books
-    .map((id) => id.trim())
-    .filter((id) => mongoose.Types.ObjectId.isValid(id));
-  if (books.length === 0) {
-    return next(new ErrorHandler("Invalid book IDs provided", 400));
+  // যদি comma separated string হিসেবে আসে
+  if (typeof books === "string" && books.includes(",")) {
+    books = books.split(",").map((id) => id.trim());
+  }
+
+  // যদি JSON string হিসেবে আসে
+  if (typeof books === "string" && books.startsWith("[")) {
+    try {
+      books = JSON.parse(books);
+    } catch (error) {
+      // JSON parse error ignore করুন
+    }
+  }
+
+  // তারপর আপনার existing validation চালু রাখুন
+  if (!Array.isArray(books) || books.length === 0) {
+    return next(new ErrorHandler("At least one book ID is required", 400));
   }
 
   // Validate main image
@@ -182,8 +196,16 @@ const updatePackage = catchAsyncErrors(async (req, res, next) => {
   }
 
   // Handle books update - now expecting array of book IDs
-  if (req.body.books) {
+  // Handle books update - now expecting array of book IDs
+  if (req.body.books || req.body["books[]"]) {
     let books = req.body.books;
+
+    // ✅ FIX: Handle array notation
+    if (req.body["books[]"]) {
+      books = Array.isArray(req.body["books[]"])
+        ? req.body["books[]"]
+        : [req.body["books[]"]];
+    }
 
     // Validate books array
     if (!Array.isArray(books) || books.length === 0) {
@@ -227,7 +249,9 @@ const updatePackage = catchAsyncErrors(async (req, res, next) => {
 
 // Get All Packages
 const getAllPackages = catchAsyncErrors(async (req, res, next) => {
-  const packages = await Package.find().sort({ createdAt: -1 });
+  const packages = await Package.find()
+    .populate("books", "name writer image price discountPrice type") // ✅ Books populate করুন
+    .sort({ createdAt: -1 });
 
   res.status(200).json({
     success: true,

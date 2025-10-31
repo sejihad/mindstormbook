@@ -174,7 +174,7 @@ const UpdatePackage = () => {
 
     // Books data - only IDs
     formData.books.forEach((bookId) => {
-      data.append("books", bookId);
+      data.append("books[]", bookId); // ✅ Change here
     });
 
     // Images
