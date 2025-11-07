@@ -17,7 +17,11 @@ const registerUser = catchAsyncErrors(async (req, res, next) => {
       new ErrorHandler("Please provide name, email, and password", 400)
     );
   }
+  const existUser = await User.findOne({ email });
 
+  if (existUser) {
+    return next(new ErrorHandler("User already exists. Please login.", 400));
+  }
   const user = await User.create({
     name,
     email,

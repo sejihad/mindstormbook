@@ -93,8 +93,6 @@ const NewPackage = () => {
       ...formData,
       books: newSelectedBooks.map((book) => book._id),
     });
-
-    toast.success("Book added to package");
   };
 
   // Remove book from selection

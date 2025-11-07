@@ -7,6 +7,7 @@ const cloudinary = require("cloudinary");
 
 // Create Package
 const createPackage = catchAsyncErrors(async (req, res, next) => {
+  // ✅ FIXED: Remove "books" from requiredFields since it comes from FormData differently
   const requiredFields = [
     "name",
     "description",
@@ -14,7 +15,7 @@ const createPackage = catchAsyncErrors(async (req, res, next) => {
     "discountPrice",
     "deliveryTime",
     "deliverToCountries",
-    "books", // books field now required (array of Book IDs)
+    // "books" removed from here - handled separately below
   ];
 
   // Check required fields
@@ -24,35 +25,31 @@ const createPackage = catchAsyncErrors(async (req, res, next) => {
     }
   }
 
+  // ✅ FIXED: Handle books validation separately for FormData
   let books = req.body.books;
 
-  // যদি array notation এ data আসে (books[]=id1&books[]=id2)
+  // Check if books come from array notation (frontend sends "books[]")
   if (req.body["books[]"]) {
     books = Array.isArray(req.body["books[]"])
       ? req.body["books[]"]
       : [req.body["books[]"]];
   }
 
-  // যদি comma separated string হিসেবে আসে
-  if (typeof books === "string" && books.includes(",")) {
-    books = books.split(",").map((id) => id.trim());
+  // Validate books array
+  if (!books || !Array.isArray(books) || books.length === 0) {
+    return next(new ErrorHandler("At least one book is required", 400));
   }
 
-  // যদি JSON string হিসেবে আসে
-  if (typeof books === "string" && books.startsWith("[")) {
-    try {
-      books = JSON.parse(books);
-    } catch (error) {
-      // JSON parse error ignore করুন
-    }
+  // Ensure all items are valid ObjectIds
+  books = books
+    .map((id) => id.toString().trim())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+  if (books.length === 0) {
+    return next(new ErrorHandler("Invalid book IDs provided", 400));
   }
 
-  // তারপর আপনার existing validation চালু রাখুন
-  if (!Array.isArray(books) || books.length === 0) {
-    return next(new ErrorHandler("At least one book ID is required", 400));
-  }
-
-  // Validate main image
+  // ✅ Image validation (same as before)
   if (!req.files?.image) {
     return next(new ErrorHandler("Package image is required", 400));
   }
@@ -118,6 +115,7 @@ const createPackage = catchAsyncErrors(async (req, res, next) => {
     package: packageDoc,
   });
 });
+
 // Update Package
 const updatePackage = catchAsyncErrors(async (req, res, next) => {
   const packageId = req.params.id;
