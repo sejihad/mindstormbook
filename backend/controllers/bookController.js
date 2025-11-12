@@ -117,21 +117,16 @@ const createBook = catchAsyncErrors(async (req, res, next) => {
 
   // Upload full PDF (only for ebooks)
   let fullPdf = null;
-  if (req.body.type === "ebook") {
-    if (!req.files?.fullPdf) {
-      return res.status(400).json({
-        success: false,
-        message: "Full PDF is required for ebooks",
-      });
-    }
 
+  // যদি ফাইল থাকে, আপলোড কর
+  if (req.files?.fullPdf) {
     try {
       fullPdf = await uploadPdfFile(req.files.fullPdf, "/book/full_pdfs");
     } catch (error) {
       console.error("Full PDF upload error:", error);
       return res.status(500).json({
         success: false,
-        message: "Failed to upload full PDF (required for ebooks)",
+        message: "Failed to upload full PDF",
       });
     }
   }
@@ -339,46 +334,28 @@ const updateBook = catchAsyncErrors(async (req, res, next) => {
       // Don't return error, just continue
     }
   }
-
-  // ---------- FULL PDF (for EBOOKS) ----------
   const currentType = req.body.type || book.type;
-
-  if (currentType === "ebook" && req.files?.fullPdf) {
+  // ---------- FULL PDF (if provided) ----------
+  if (req.files?.fullPdf) {
     try {
-      // Delete old full PDF if exists
+      // পুরানো ফাইল থাকলে ডিলিট কর
       if (book.fullPdf?.public_id) {
         await cloudinary.uploader.destroy(book.fullPdf.public_id, {
           resource_type: "raw",
         });
       }
 
-      // Upload new full PDF
+      // নতুন ফাইল আপলোড কর
       req.body.fullPdf = await uploadPdfFile(
         req.files.fullPdf,
         "/book/full_pdfs"
       );
     } catch (error) {
-      console.error("Full PDF update error:", error);
+      console.error("Full PDF upload/update error:", error);
       return res.status(500).json({
         success: false,
-        message: "Failed to update full PDF",
+        message: "Failed to upload/update full PDF",
       });
-    }
-  }
-
-  // If changing from ebook to other type, remove full PDF
-  if (
-    book.type === "ebook" &&
-    currentType !== "ebook" &&
-    book.fullPdf?.public_id
-  ) {
-    try {
-      await cloudinary.uploader.destroy(book.fullPdf.public_id, {
-        resource_type: "raw",
-      });
-      req.body.fullPdf = null;
-    } catch (error) {
-      console.error("Error removing full PDF:", error);
     }
   }
 

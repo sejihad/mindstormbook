@@ -557,7 +557,7 @@ const UpdateBook = () => {
                 )}
 
                 {/* Full PDF (for E-Book only) */}
-                {formData.type === "ebook" && (
+                {formData.type !== "audiobook" && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Full PDF

@@ -24,7 +24,7 @@ const getSingleOrder = catchAsyncErrors(async (req, res, next) => {
 });
 const getSingleAdminOrder = catchAsyncErrors(async (req, res, next) => {
   const order = await Order.findById(req.params.id);
-  console.log(order);
+
   if (!order) {
     return next(new ErrorHandler("Order not found with this ID", 404));
   }

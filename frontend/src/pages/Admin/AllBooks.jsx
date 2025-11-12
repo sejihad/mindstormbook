@@ -239,9 +239,6 @@ const AllBooks = () => {
                                 {book.category}
                               </span>
                             </div>
-                            <div className="text-xs text-gray-400 mt-1">
-                              Stock: {book.stock || 0}
-                            </div>
                           </div>
                         </td>
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-600 hidden sm:table-cell">

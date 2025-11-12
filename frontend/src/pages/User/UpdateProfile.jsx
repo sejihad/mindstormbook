@@ -43,7 +43,15 @@ const UpdateProfile = () => {
   // Load all countries on component mount
   useEffect(() => {
     const countries = Country.getAllCountries();
-    setFilteredCountries(countries);
+
+    // Move preferred countries to the top
+    const priority = ["United States", "Canada", "Mexico"];
+    const sortedCountries = [
+      ...countries.filter((c) => priority.includes(c.name)),
+      ...countries.filter((c) => !priority.includes(c.name)),
+    ];
+
+    setFilteredCountries(sortedCountries);
 
     // Close dropdown when clicking outside
     const handleClickOutside = (event) => {
@@ -62,14 +70,25 @@ const UpdateProfile = () => {
 
   // Filter countries based on search input
   useEffect(() => {
+    const allCountries = Country.getAllCountries();
+    const priority = ["United States", "Canada", "Mexico"];
+    let filtered;
+
     if (countrySearch) {
-      const filtered = Country.getAllCountries().filter((c) =>
+      filtered = allCountries.filter((c) =>
         c.name.toLowerCase().includes(countrySearch.toLowerCase())
       );
-      setFilteredCountries(filtered);
     } else {
-      setFilteredCountries(Country.getAllCountries());
+      filtered = allCountries;
     }
+
+    // Always keep priority countries on top
+    const sortedFiltered = [
+      ...filtered.filter((c) => priority.includes(c.name)),
+      ...filtered.filter((c) => !priority.includes(c.name)),
+    ];
+
+    setFilteredCountries(sortedFiltered);
   }, [countrySearch]);
 
   // Auto-detect country code from phone number for PhoneInput

@@ -130,11 +130,6 @@ const AllShips = () => {
       return toast.error("Please fill all fields");
     }
 
-    // Validate charge is a positive number
-    if (Number(charge) <= 0) {
-      return toast.error("Shipping charge must be greater than 0");
-    }
-
     const formData = {
       country,
       charge: Number(charge),
@@ -275,8 +270,6 @@ const AllShips = () => {
                     type="number"
                     placeholder="Enter shipping charge"
                     required
-                    min="0.01"
-                    step="0.01"
                     value={charge}
                     onChange={(e) => setCharge(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors hover:border-gray-400"

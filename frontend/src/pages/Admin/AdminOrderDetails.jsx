@@ -1,11 +1,15 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useEffect, useState } from "react";
+
+import axios from "axios";
+import { Country } from "country-state-city";
 import {
   FaBox,
   FaCheckCircle,
   FaClock,
   FaCreditCard,
+  FaPrint,
   FaShippingFast,
   FaTimesCircle,
 } from "react-icons/fa";
@@ -21,7 +25,6 @@ import {
 import Loader from "../../component/layout/Loader/Loader";
 import MetaData from "../../component/layout/MetaData";
 import Sidebar from "./Sidebar";
-
 const AdminOrderDetails = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -29,6 +32,23 @@ const AdminOrderDetails = () => {
   const [status, setStatus] = useState("");
   const [booksData, setBooksData] = useState({});
   const [isLoadingBooks, setIsLoadingBooks] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [printFormData, setPrintFormData] = useState({
+    contact_email: "ubmsb75@gmail.com",
+    production_delay: "",
+    line_items: [],
+    shipping_address: {
+      name: "",
+      street1: "",
+      city: "",
+      state_code: "",
+      country_code: "",
+      postcode: "",
+      phone_number: "",
+    },
+    shipping_level: "EXPRESS",
+  });
 
   const { order, loading, error } = useSelector((state) => state.orderDetails);
   const { isUpdated, error: updateError } = useSelector((state) => state.order);
@@ -56,6 +76,7 @@ const AdminOrderDetails = () => {
 
   // Package-এর বইগুলো fetch করা
   useEffect(() => {
+    dispatch(getBook());
     const fetchBooksForPackages = async () => {
       if (!order || !order.orderItems) return;
 
@@ -95,6 +116,11 @@ const AdminOrderDetails = () => {
     return booksData[bookId]?.name || "Book not found";
   };
 
+  // Function to get book details by ID
+  const getBookDetails = (bookId) => {
+    return booksData[bookId] || null;
+  };
+
   // Function to render book names for packages in UI
   const renderBookNames = (item) => {
     if (item.type === "package" && item.books && item.books.length > 0) {
@@ -116,6 +142,212 @@ const AdminOrderDetails = () => {
     return null;
   };
 
+  // Check if order has printable books
+  const hasPrintableBooks = () => {
+    // 🛑 1️⃣ যদি order বা orderItems না থাকে
+    if (!order || !order.orderItems) return false;
+
+    // 🧩 2️⃣ Filter printable items
+    const printableItems = order.orderItems.filter((item) => {
+      // যদি order item "book" হয়
+      if (item.type === "book" && item.id) {
+        const book = booksData[item.id];
+
+        return book && (book.image?.url || book.fullPdf?.url);
+      }
+
+      // যদি order item "package" হয়
+      if (
+        item.type === "package" &&
+        Array.isArray(item.books) &&
+        item.books.length > 0
+      ) {
+        return item.books.some((bookRef) => {
+          const bookId = bookRef.$oid || bookRef._id || bookRef;
+          const book = booksData[bookId];
+
+          return book && (book.image?.url || book.fullPdf?.url);
+        });
+      }
+
+      return false;
+    });
+
+    // ✅ 3️⃣ অন্তত একটি printable item থাকলে true
+    return printableItems.length > 0;
+  };
+
+  // Get all printable books from order
+
+  const getPrintableBooks = () => {
+    if (!order || !order.orderItems) return [];
+
+    const printableBooks = [];
+
+    order.orderItems.forEach((item) => {
+      // শুধুমাত্র type === "book" (ebook এবং audiobook বাদ)
+      if (item.type === "book" && item.id) {
+        const book = booksData[item.id];
+        printableBooks.push({
+          ...book,
+          quantity: item.quantity,
+          external_id: `book-${item.id}`,
+          title: item.name,
+        });
+      }
+
+      // Package এর ক্ষেত্রে - শুধুমাত্র type === "book" বইগুলো নেবে
+      else if (item.type === "package" && item.books && item.books.length > 0) {
+        // Package items - শুধুমাত্র individual books (type === "book") যোগ করবে
+        item.books.forEach((bookId) => {
+          const book = getBookDetails(bookId);
+          // শুধুমাত্র বই যার type === "book" এবং প্রিন্ট করা যায়
+          if (
+            book &&
+            book.type === "book" &&
+            (book.image?.url || book.fullPdf?.url)
+          ) {
+            printableBooks.push({
+              ...book,
+              quantity: item.quantity, // package এর quantity individual book এ apply হবে
+              external_id: `book-${book._id}`,
+              title: book.name,
+            });
+          }
+        });
+      }
+    });
+
+    return printableBooks;
+  };
+
+  // Initialize print form data when modal opens
+  const initializePrintForm = () => {
+    if (!order) return;
+
+    const printableBooks = getPrintableBooks();
+
+    const lineItems = printableBooks.map((book) => ({
+      external_id: book._id,
+
+      printable_normalization: {
+        cover: {
+          source_url: book.image?.url,
+        },
+        interior: {
+          source_url: book.fullPdf?.url,
+        },
+        pod_package_id: "0600X0900BWSTDPB060UW444MXX", // Default package ID
+      },
+      quantity: book.quantity || 1,
+      title: book.name,
+    }));
+
+    // ✅ Step 1: ইউজার ইনপুট নাও
+    const shippingCountry = order?.shippingInfo?.country?.trim() || "";
+
+    // ✅ Step 2: Country নাম মেলাও (case-insensitive)
+    const matchedCountry = Country.getAllCountries().find(
+      (c) => c.name.toLowerCase() === shippingCountry.toLowerCase()
+    );
+
+    // ✅ Step 3: Country code নাও বা fallback সেট করো
+    const countryCode = matchedCountry.isoCode;
+
+    setPrintFormData({
+      contact_email: "ubmsb75@gmail.com",
+      line_items: lineItems,
+      production_delay: 120,
+      shipping_address: {
+        name: order.shippingInfo?.name || `${order.user?.name}`,
+        street1: order.shippingInfo?.address || "",
+        city: order.shippingInfo?.city || "",
+        state_code: order.shippingInfo?.state || "",
+        country_code: countryCode,
+        postcode: order.shippingInfo?.pinCode || "",
+        phone_number: order.shippingInfo?.phone || "",
+      },
+      shipping_level: "EXPRESS",
+      external_id: `order-${order._id}`,
+    });
+
+    setShowPrintModal(true);
+  };
+
+  // Handle print form input changes
+  // Handle print form input changes
+  const handlePrintFormChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name.startsWith("shipping_")) {
+      const field = name.replace("shipping_", "");
+      setPrintFormData((prev) => ({
+        ...prev,
+        shipping_address: {
+          ...prev.shipping_address,
+          [field]: value,
+        },
+      }));
+    } else if (name.startsWith("book_")) {
+      const [_, index, field] = name.split("_");
+      const updatedLineItems = [...printFormData.line_items];
+      console.log("Updating field:", field, "Index:", index, "Value:", value);
+      if (field === "quantity") {
+        updatedLineItems[index].quantity = parseInt(value);
+      } else if (field === "pod_package_id") {
+        updatedLineItems[index].printable_normalization.pod_package_id = value;
+      } else if (field === "cover_url") {
+        updatedLineItems[index].printable_normalization.cover.source_url =
+          value;
+      } else if (field === "interior_url") {
+        updatedLineItems[index].printable_normalization.interior.source_url =
+          value;
+      } else if (field === "title") {
+        updatedLineItems[index].title = value;
+      }
+      console.log(updatedLineItems);
+      setPrintFormData((prev) => ({
+        ...prev,
+        line_items: updatedLineItems,
+      }));
+    } else {
+      setPrintFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+  };
+
+  // Create Lulu order
+  const createLuluOrder = async () => {
+    setIsCreatingOrder(true);
+
+    try {
+      const { data } = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/v1/print/create-lulu-order`,
+        printFormData,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (data.success) {
+        toast.success("Print order created successfully!");
+        setShowPrintModal(false);
+      } else {
+        toast.error(data.message || "Failed to create print order");
+      }
+    } catch (error) {
+      console.error("Error creating Lulu order:", error);
+      toast.error(
+        error.response?.data?.message || "Error creating print order"
+      );
+    } finally {
+      setIsCreatingOrder(false);
+    }
+  };
   const getStatusIcon = (status) => {
     switch (status?.toLowerCase()) {
       case "completed":
@@ -342,6 +574,16 @@ const AdminOrderDetails = () => {
             Order Details #{order?._id?.slice(-6)?.toUpperCase() || ""}
           </h1>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            {/* Print Button - Only show for orders with printable books */}
+            {hasPrintableBooks() && (
+              <button
+                onClick={initializePrintForm}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 text-sm sm:text-base flex items-center"
+              >
+                <FaPrint className="mr-2" />
+                Print Books
+              </button>
+            )}
             <button
               onClick={generatePDF}
               className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 text-sm sm:text-base"
@@ -624,6 +866,254 @@ const AdminOrderDetails = () => {
             </div>
           )}
         </div>
+
+        {/* Print Modal */}
+        {showPrintModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b">
+                <h2 className="text-xl font-bold text-gray-800">
+                  Create Print Order
+                </h2>
+                <p className="text-gray-600 mt-1">
+                  Review and edit print details for Lulu.com
+                </p>
+              </div>
+
+              <div className="p-6">
+                <form>
+                  {/* Contact Email */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Contact Email
+                    </label>
+                    <input
+                      type="email"
+                      name="contact_email"
+                      value={printFormData.contact_email}
+                      onChange={handlePrintFormChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+
+                  {/* Shipping Address */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">
+                      Shipping Address
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Full Name
+                        </label>
+                        <input
+                          type="text"
+                          name="shipping_name"
+                          value={printFormData.shipping_address.name}
+                          onChange={handlePrintFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Phone Number
+                        </label>
+                        <input
+                          type="text"
+                          name="shipping_phone_number"
+                          value={printFormData.shipping_address.phone_number}
+                          onChange={handlePrintFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Street Address
+                        </label>
+                        <input
+                          type="text"
+                          name="shipping_street1"
+                          value={printFormData.shipping_address.street1}
+                          onChange={handlePrintFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          City
+                        </label>
+                        <input
+                          type="text"
+                          name="shipping_city"
+                          value={printFormData.shipping_address.city}
+                          onChange={handlePrintFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          State/Province
+                        </label>
+                        <input
+                          type="text"
+                          name="shipping_state_code"
+                          value={printFormData.shipping_address.state_code}
+                          onChange={handlePrintFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Postal Code
+                        </label>
+                        <input
+                          type="text"
+                          name="shipping_postcode"
+                          value={printFormData.shipping_address.postcode}
+                          onChange={handlePrintFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Country Code
+                        </label>
+                        <input
+                          type="text"
+                          name="shipping_country_code"
+                          value={printFormData.shipping_address.country_code}
+                          onChange={handlePrintFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Shipping Level
+                        </label>
+                        <select
+                          name="shipping_level"
+                          value={printFormData.shipping_level}
+                          onChange={handlePrintFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="EXPRESS">Express</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Books to Print */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">
+                      Books to Print
+                    </h3>
+                    {printFormData.line_items.map((book, index) => {
+                      return (
+                        <div key={index} className="border rounded-lg p-4 mb-4">
+                          <h4 className="font-medium text-gray-900 mb-3">
+                            {book.title}
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Cover Image URL
+                              </label>
+                              <input
+                                type="url"
+                                name={`book_${index}_cover_url`}
+                                value={
+                                  book.printable_normalization.cover.source_url
+                                }
+                                onChange={handlePrintFormChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Interior PDF URL
+                              </label>
+                              <input
+                                type="url"
+                                name={`book_${index}_interior_url`}
+                                value={
+                                  book.printable_normalization.interior
+                                    .source_url
+                                }
+                                onChange={handlePrintFormChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Quantity
+                              </label>
+                              <input
+                                type="number"
+                                name={`book_${index}_quantity`}
+                                value={book.quantity}
+                                onChange={handlePrintFormChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                min="1"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Package ID
+                              </label>
+                              <input
+                                type="text"
+                                name={`book_${index}_pod_package_id`}
+                                value={
+                                  book.printable_normalization.pod_package_id
+                                }
+                                onChange={handlePrintFormChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </form>
+              </div>
+
+              <div className="p-6 border-t bg-gray-50 flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowPrintModal(false)}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  disabled={isCreatingOrder}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createLuluOrder}
+                  disabled={isCreatingOrder}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {isCreatingOrder ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Creating Order...
+                    </>
+                  ) : (
+                    <>
+                      <FaPrint className="mr-2" />
+                      Create Print Order
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
