@@ -14,7 +14,7 @@ const ship = require("./routes/shipRoute");
 const email = require("./routes/emailRoute");
 const package = require("./routes/packageRoute");
 const stripe = require("./routes/stripeRoute");
-const print = require("./routes/lulu");
+// const print = require("./routes/lulu");
 const paypal = require("./routes/paypalRoute");
 const notification = require("./routes/notificationRoute");
 const order = require("./routes/orderRoute");
@@ -62,7 +62,7 @@ app.use("/api/v1", stripe);
 app.use("/api/v1", email);
 app.use("/api/v1", paypal);
 app.use("/api/v1", order);
-app.use("/api/v1", print);
+// app.use("/api/v1", print);
 // Error Middleware
 app.use(errorMiddleware);
 
